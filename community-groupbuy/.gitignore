@@ -1,0 +1,16 @@
+# Maven 构建产物
+target/
+
+# IDE
+*.iml
+.idea/
+.vscode/
+.settings/
+.project
+.classpath
+
+# 日志
+*.log
+
+# 本地覆盖配置
+application-local.yml

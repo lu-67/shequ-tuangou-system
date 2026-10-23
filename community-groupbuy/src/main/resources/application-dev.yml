@@ -1,0 +1,28 @@
+spring:
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3307/community_groupbuy?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false
+    username: root
+    password: 123456
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      database: 0
+      timeout: 3000ms
+
+# JWT 密钥：演示环境写死，生产请改用环境变量 JWT_SECRET
+jwt:
+  secret: community-groupbuy-dev-secret-key-2026-do-not-use-in-prod
+  expiration: 86400000   # 24h
+
+# 是否启用 Redis（无 Redis 也可启动，核心流程自动降级到数据库）
+app:
+  redis:
+    enabled: true
+  # 下单接口令牌桶限流（Lua 令牌桶）
+  rate-limit:
+    enabled: true
+    capacity: 200
+    refill-tokens: 50
+    refill-seconds: 1

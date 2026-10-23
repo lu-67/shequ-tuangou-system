@@ -1,0 +1,21 @@
+# 工程数据 / 构建产物 / IDE
+.workbuddy/
+target/
+node_modules/
+dist/
+*.iml
+.idea/
+.vscode/
+*.class
+*.log
+.DS_Store
+
+# 本地敏感配置（如有）
+*.local.yml
+
+# 本地协作文档（不推送，单独发给组员）
+组员协作与AI提示词手册.md
+组员协作与AI提示词手册.html
+
+# 报告书模板等本地文档不进仓库
+*.docx

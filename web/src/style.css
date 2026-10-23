@@ -1,0 +1,197 @@
+* {
+  box-sizing: border-box;
+}
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+/* ===== 主题变量 ===== */
+:root {
+  --primary: #2f9e44;
+  --primary-dark: #2b8a3e;
+  --primary-light: #ebfbee;
+  --price: #e03131;
+  --text-1: #212529;
+  --text-2: #495057;
+  --text-3: #adb5bd;
+  --border: #e9ecef;
+  --bg-page: #f4f6f8;
+  --card-shadow: 0 1px 3px rgba(15, 34, 25, 0.07);
+  --card-shadow-hover: 0 12px 28px rgba(15, 34, 25, 0.13);
+
+  /* Element Plus 主色 / 危险色覆盖为生鲜绿与团购红 */
+  --el-color-primary: #2f9e44;
+  --el-color-primary-light-3: #51cf66;
+  --el-color-primary-light-5: #8ce99a;
+  --el-color-primary-light-7: #b2f2bb;
+  --el-color-primary-light-8: #c6f6d5;
+  --el-color-primary-light-9: #ebfbee;
+  --el-color-primary-dark-2: #2b8a3e;
+  --el-color-danger: #e03131;
+  --el-color-danger-light-3: #f06565;
+  --el-color-danger-light-5: #f69898;
+  --el-color-danger-light-7: #fababa;
+  --el-color-danger-light-8: #fcd2d2;
+  --el-color-danger-light-9: #fee9e9;
+  --el-color-danger-dark-2: #c92a2a;
+}
+
+body {
+  font-family: 'Helvetica Neue', Helvetica, 'PingFang SC', 'Microsoft YaHei', Arial, sans-serif;
+  background: var(--bg-page);
+  color: var(--text-1);
+}
+
+/* ===== 登录页 ===== */
+.login-wrap {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #2b8a3e 0%, #2f9e44 55%, #51cf66 100%);
+}
+.login-card {
+  width: 880px;
+  max-width: 94vw;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.22);
+  overflow: hidden;
+  display: flex;
+}
+.login-brand {
+  width: 44%;
+  background: linear-gradient(160deg, #2b8a3e 0%, #40c057 100%);
+  color: #fff;
+  padding: 48px 40px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+.login-brand .b-logo {
+  font-size: 40px;
+}
+.login-brand h1 {
+  margin: 12px 0 8px;
+  font-size: 26px;
+}
+.login-brand .b-slogan {
+  font-size: 14px;
+  opacity: 0.92;
+  line-height: 1.7;
+}
+.login-brand .b-emojis {
+  font-size: 30px;
+  letter-spacing: 8px;
+  margin-top: 24px;
+}
+.login-brand .b-foot {
+  font-size: 12px;
+  opacity: 0.75;
+  margin-top: 32px;
+}
+.login-form {
+  flex: 1;
+  padding: 52px 48px;
+}
+.login-form .f-title {
+  margin: 0 0 4px;
+  font-size: 22px;
+  font-weight: 700;
+  text-align: left;
+}
+.login-form .f-sub {
+  margin: 0 0 28px;
+  font-size: 13px;
+  color: var(--text-3);
+  text-align: left;
+}
+.login-form .f-tip {
+  margin: 20px 0 0;
+  font-size: 12px;
+  color: var(--text-3);
+  text-align: center;
+}
+@media (max-width: 720px) {
+  .login-brand {
+    display: none;
+  }
+  .login-form {
+    padding: 40px 28px;
+  }
+}
+
+/* ===== 页面容器 ===== */
+.page {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px 24px 56px;
+}
+
+/* ===== 区块标题 ===== */
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-1);
+}
+.section-title .bar {
+  width: 4px;
+  height: 20px;
+  background: var(--primary);
+  border-radius: 2px;
+}
+.section-title .count {
+  font-size: 13px;
+  color: var(--text-3);
+  font-weight: 400;
+}
+
+/* ===== 列表头部（标题 + 工具区） ===== */
+.list-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+.list-tools {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+/* ===== 分类标签 ===== */
+.cats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.cat-chip {
+  padding: 6px 14px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  font-size: 13px;
+  color: var(--text-2);
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.15s;
+}
+.cat-chip:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+.cat-chip.on {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
