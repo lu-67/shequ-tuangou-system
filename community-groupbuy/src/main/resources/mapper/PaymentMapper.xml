@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.community.groupbuy.mapper.PaymentMapper">
+
+    <!-- 动态条件片段：流水号 / 订单号 / 状态，供列表与计数复用 -->
+    <sql id="paymentCondition">
+        <where>
+            <if test="payNo != null and payNo != ''">
+                AND pay_no = #{payNo}
+            </if>
+            <if test="orderNo != null and orderNo != ''">
+                AND order_no = #{orderNo}
+            </if>
+            <if test="status != null and status != ''">
+                AND status = #{status}
+            </if>
+        </where>
+    </sql>
+
+    <!-- M4 动态查询（分页）：条件全部可选，手写 LIMIT 分页 -->
+    <select id="selectByCondition" parameterType="com.community.groupbuy.dto.PaymentQueryDTO"
+            resultType="com.community.groupbuy.entity.Payment">
+        SELECT * FROM payment
+        <include refid="paymentCondition"/>
+        ORDER BY id DESC
+        LIMIT #{offset}, #{size}
+    </select>
+
+    <!-- M4 动态统计：与查询共用同一套条件，保证分页 total 一致 -->
+    <select id="countByCondition" parameterType="com.community.groupbuy.dto.PaymentQueryDTO"
+            resultType="long">
+        SELECT COUNT(*) FROM payment
+        <include refid="paymentCondition"/>
+    </select>
+
+</mapper>

@@ -27,6 +27,8 @@ public enum ResultCode {
     ORDER_NOT_FOUND(3001, "订单不存在"),
     ORDER_STATUS_ERROR(3002, "订单状态异常"),
     PAY_FAILED(3003, "支付失败"),
+    PAY_SIGN_ERROR(3004, "支付回调验签失败"),
+    PAY_AMOUNT_MISMATCH(3005, "支付金额与订单金额不一致"),
     VERIFY_CODE_INVALID(4001, "核销码无效"),
     VERIFY_ALREADY_DONE(4002, "该订单已核销，不可重复核销"),
     RATE_LIMIT(5001, "请求过于频繁，请稍后再试"),

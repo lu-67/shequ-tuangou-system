@@ -33,4 +33,17 @@ public interface OrderMapper {
 
     /** 手写动态 SQL：按条件查询（状态/活动/用户/订单号），见 OrderMapper.xml */
     List<GroupOrder> selectByCondition(OrderQueryDTO query);
+
+    /** M4：按订单号查询（回调对账用） */
+    @Select("SELECT * FROM group_order WHERE order_no = #{orderNo}")
+    GroupOrder selectByOrderNo(@Param("orderNo") String orderNo);
+
+    /**
+     * M4：订单状态流转（CAS），带上原状态作为条件，返回值 0 表示状态已被其他操作变更。
+     * 支付入账时自动写 pay_time，保证并发回调只有一个能改成功。
+     */
+    @Update("UPDATE group_order SET status = #{to}, "
+            + "pay_time = CASE WHEN #{to} = 'PAID' THEN NOW() ELSE pay_time END "
+            + "WHERE id = #{id} AND status = #{from}")
+    int updateStatusCAS(@Param("id") Long id, @Param("from") String from, @Param("to") String to);
 }
