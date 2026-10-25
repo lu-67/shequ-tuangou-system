@@ -1,16 +1,22 @@
 package com.community.groupbuy.mapper;
 
+import com.community.groupbuy.dto.ActivityQueryDTO;
 import com.community.groupbuy.entity.GroupActivity;
+import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Options;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
 
+import java.time.LocalDateTime;
+import java.util.List;
+
 /**
- * 团购活动 Mapper（当前仅保留 M3 参团下单依赖的方法）
+ * 团购活动 Mapper
  *
- * 说明：insert / updateStatus / selectOngoing / 动态条件查询 属于 M2 开团活动（B 同学）负责，
- * 由 B 同学按其需求在此接口中补充。
+ * M3 参团下单依赖：selectById / deductStockCAS / incrementStock（组长实现）
+ * M2 开团活动（B 同学）补充：insert / updateStatusCAS / selectByCondition / countByCondition / selectOngoing / selectExpired
  */
 @Mapper
 public interface ActivityMapper {
@@ -28,4 +34,29 @@ public interface ActivityMapper {
     /** 库存回补（退款/取消时使用，M4 支付成团（B 同学）会用到） */
     @Update("UPDATE group_activity SET stock = stock + #{qty} WHERE id = #{activityId}")
     int incrementStock(@Param("activityId") Long activityId, @Param("qty") Integer qty);
+
+    /** M2：创建开团活动，主键回填到 id */
+    @Insert("INSERT INTO group_activity(product_id, title, origin_price, group_price, total_stock, stock, per_limit, status, start_time, end_time) "
+            + "VALUES(#{productId}, #{title}, #{originPrice}, #{groupPrice}, #{totalStock}, #{stock}, #{perLimit}, #{status}, #{startTime}, #{endTime})")
+    @Options(useGeneratedKeys = true, keyProperty = "id")
+    int insert(GroupActivity activity);
+
+    /**
+     * M2：状态流转（CAS）。
+     * 带上原状态作为条件，并发下只有一方能更新成功，受影响行数=0 表示状态已被其他操作变更。
+     */
+    @Update("UPDATE group_activity SET status = #{to} WHERE id = #{id} AND status = #{from}")
+    int updateStatusCAS(@Param("id") Long id, @Param("from") String from, @Param("to") String to);
+
+    /** M2：动态条件分页查询，见 ActivityMapper.xml */
+    List<GroupActivity> selectByCondition(ActivityQueryDTO query);
+
+    /** M2：动态条件统计总数，见 ActivityMapper.xml */
+    long countByCondition(ActivityQueryDTO query);
+
+    /** M2：进行中的活动列表（首页用），按结束时间正序（快结束的排前面） */
+    List<GroupActivity> selectOngoing();
+
+    /** M8：已到期但仍处于 ONGOING 的活动，供定时任务判定成团/失败 */
+    List<GroupActivity> selectExpired(@Param("now") LocalDateTime now);
 }

@@ -23,6 +23,7 @@ public enum ResultCode {
     ACTIVITY_NOT_FOUND(2001, "团购活动不存在"),
     ACTIVITY_NOT_ONGOING(2002, "活动未在进行中"),
     STOCK_NOT_ENOUGH(2003, "库存不足/已抢光"),
+    ACTIVITY_STATUS_ERROR(2004, "活动状态流转非法"),
     ORDER_NOT_FOUND(3001, "订单不存在"),
     ORDER_STATUS_ERROR(3002, "订单状态异常"),
     PAY_FAILED(3003, "支付失败"),
