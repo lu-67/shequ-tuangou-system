@@ -2,12 +2,23 @@
   <el-container style="height: 100%">
     <el-aside width="210px" style="background: #001529">
       <div class="logo">社区团购后台</div>
-      <!-- 模块菜单由各负责组员实现页面后在此补充（见 router/index.js 顶部说明） -->
+      <!-- B 同学：M2 开团活动页面已实现；其余模块页面待对应组员补充 -->
+      <el-menu
+        :default-active="activePath"
+        background-color="#001529"
+        text-color="#a6adb8"
+        active-text-color="#fff"
+        router
+      >
+        <el-menu-item index="/activities">
+          <el-icon><Box /></el-icon>
+          <span>开团活动</span>
+        </el-menu-item>
+      </el-menu>
       <div class="menu-tip">
-        <p>各模块页面建设中：</p>
+        <p>待其他模块实现：</p>
         <p>· 登录页 / 用户权限 —— D</p>
         <p>· 商品管理 / 自提核销 / 统计 —— C</p>
-        <p>· 开团活动 —— B</p>
       </div>
     </el-aside>
 
@@ -48,12 +59,14 @@
 <script setup>
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
+// 图标由 main.js 全局注册（@element-plus/icons-vue），此处无需单独引入
 import { useUserStore } from '../stores/user'
 
 const route = useRoute()
 const user = useUserStore()
 
 const pageTitle = computed(() => route.meta.title || '管理后台')
+const activePath = computed(() => route.path)
 
 // 登录页由 D 同学实现后，改为 router.push('/login')
 function handleCommand(cmd) {

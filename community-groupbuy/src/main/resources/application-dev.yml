@@ -26,3 +26,11 @@ app:
     capacity: 200
     refill-tokens: 50
     refill-seconds: 1
+  # M4 支付回调验签密钥：演示环境写死，生产改用环境变量 APP_PAY_SECRET
+  pay:
+    secret: community-groupbuy-pay-dev-secret-2026
+    # M8 定时任务：超时未支付订单自动取消的分钟数
+    timeout-minutes: 15
+  # M8 定时任务总开关（测试/调试时可关）
+  scheduler:
+    enabled: true

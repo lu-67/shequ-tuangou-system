@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.community.groupbuy.mapper.ActivityMapper">
+
+    <!-- 动态条件片段：状态 / 商品 / 标题模糊，供列表与计数复用 -->
+    <sql id="activityCondition">
+        <where>
+            <if test="status != null and status != ''">
+                AND status = #{status}
+            </if>
+            <if test="productId != null">
+                AND product_id = #{productId}
+            </if>
+            <if test="title != null and title != ''">
+                AND title LIKE CONCAT('%', #{title}, '%')
+            </if>
+        </where>
+    </sql>
+
+    <!-- M2 动态查询（分页）：条件全部可选，手写 LIMIT 分页 -->
+    <select id="selectByCondition" parameterType="com.community.groupbuy.dto.ActivityQueryDTO"
+            resultType="com.community.groupbuy.entity.GroupActivity">
+        SELECT * FROM group_activity
+        <include refid="activityCondition"/>
+        ORDER BY id DESC
+        LIMIT #{offset}, #{size}
+    </select>
+
+    <!-- M2 动态统计：与查询共用同一套条件，保证分页 total 一致 -->
+    <select id="countByCondition" parameterType="com.community.groupbuy.dto.ActivityQueryDTO"
+            resultType="long">
+        SELECT COUNT(*) FROM group_activity
+        <include refid="activityCondition"/>
+    </select>
+
+    <!-- M2 进行中活动（首页） -->
+    <select id="selectOngoing" resultType="com.community.groupbuy.entity.GroupActivity">
+        SELECT * FROM group_activity
+        WHERE status = 'ONGOING'
+        ORDER BY end_time ASC
+    </select>
+
+    <!-- M8 定时任务：已到期但仍在进行的活动 -->
+    <select id="selectExpired" resultType="com.community.groupbuy.entity.GroupActivity">
+        SELECT * FROM group_activity
+        WHERE status = 'ONGOING'
+          AND end_time IS NOT NULL
+          AND end_time <![CDATA[ <= ]]> #{now}
+        ORDER BY end_time ASC
+    </select>
+
+</mapper>
