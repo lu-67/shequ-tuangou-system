@@ -8,6 +8,7 @@ import com.community.groupbuy.dto.CreateActivityDTO;
 import com.community.groupbuy.dto.PageResult;
 import com.community.groupbuy.entity.GroupActivity;
 import com.community.groupbuy.mapper.ActivityMapper;
+import com.community.groupbuy.mapper.OrderMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -24,6 +25,8 @@ import java.util.List;
 public class ActivityService {
 
     private final ActivityMapper activityMapper;
+
+    private final OrderMapper orderMapper;
 
     /**
      * 创建开团活动（团长 / 管理员）。
@@ -75,18 +78,31 @@ public class ActivityService {
     }
 
     /**
-     * 售罄即成团：库存售罄时把 ONGOING 活动判定为 SUCCESS。
-     * 供 M4 支付成功与 M8 定时任务调用；并发下 CAS 仅一方生效，未抢到的返回 false 不报错。
+     * 成团判定（全项目唯一口径）：「已参团份数」达到 total_stock 时，把 ONGOING 活动判定为 SUCCESS。
+     *
+     * 已参团份数 = 该活动已支付（PAID）订单的数量汇总，不新增字段（约定：不改表结构），
+     * 因此支付成功一笔，已参团份数自动 +1 份 —— 即需求里的「支付成功后已参团人数 +1」。
+     * 注意：不可用 total_stock - stock 代替，那个口径把未支付订单也算进去了。
+     *
+     * 供 M4 支付成功（实时判定）与 M8 定时任务（兜底判定）共用；
+     * 状态流转走 CAS，并发下只有一方生效，未抢到的一方返回 false，不报错（幂等）。
      */
     @Transactional(rollbackFor = Exception.class)
-    public boolean markSuccessIfSoldOut(Long activityId) {
+    public boolean markSuccessIfReached(Long activityId) {
         GroupActivity activity = activityMapper.selectById(activityId);
-        if (activity == null || !Constants.ACTIVITY_ONGOING.equals(activity.getStatus()) || activity.getStock() > 0) {
+        if (activity == null || !Constants.ACTIVITY_ONGOING.equals(activity.getStatus())) {
+            return false;
+        }
+        long joinedQuantity = orderMapper.sumPaidQuantity(activityId);
+        if (joinedQuantity < activity.getTotalStock()) {
+            log.info("活动暂未成团: activityId={}, 已参团={}/{}",
+                    activityId, joinedQuantity, activity.getTotalStock());
             return false;
         }
         int rows = activityMapper.updateStatusCAS(activityId, Constants.ACTIVITY_ONGOING, Constants.ACTIVITY_SUCCESS);
         if (rows == 1) {
-            log.info("活动已成团（库存售罄）: activityId={}", activityId);
+            log.info("活动已成团: activityId={}, 已参团={}/{}",
+                    activityId, joinedQuantity, activity.getTotalStock());
         }
         return rows == 1;
     }

@@ -126,10 +126,16 @@ public class PaymentService {
             throw new BusinessException(ResultCode.ORDER_STATUS_ERROR, "订单状态异常，支付结果不予入账: " + order.getStatus());
         }
 
-        // 5. 成团判定：库存售罄即成团（M2 提供，幂等可重入）
-        activityService.markSuccessIfSoldOut(order.getActivityId());
+        // 5. 已参团份数：不新增字段，用已支付订单汇总 —— 支付成功一笔即自动 +1 份
+        //    （不可用 total_stock - stock 代替，那个口径含未支付订单）
+        long joinedQuantity = orderMapper.sumPaidQuantity(order.getActivityId());
 
-        log.info("支付回调入账成功: payNo={}, orderId={}, amount={}", payment.getPayNo(), order.getId(), order.getAmount());
+        // 6. 实时成团判定：已参团份数达到 total_stock 即成团；未达标返回 false 不报错，
+        //    由 M8 定时任务继续兜底（到期判定 / 事件丢失补偿），两条路径 CAS 幂等互不冲突
+        activityService.markSuccessIfReached(order.getActivityId());
+
+        log.info("支付回调入账成功: payNo={}, orderId={}, amount={}, 活动已参团份数={}",
+                payment.getPayNo(), order.getId(), order.getAmount(), joinedQuantity);
         return true;
     }
 

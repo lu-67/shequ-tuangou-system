@@ -59,4 +59,14 @@ public interface ActivityMapper {
 
     /** M8：已到期但仍处于 ONGOING 的活动，供定时任务判定成团/失败 */
     List<GroupActivity> selectExpired(@Param("now") LocalDateTime now);
+
+    /**
+     * M8：进行中且「已参团份数」已达到 total_stock 的活动，由定时任务批量筛出候选。
+     * 已参团份数 = 该活动已支付（PAID）订单的数量汇总，不新增字段（约定：不改表结构）。
+     * 这里只做批量筛选，真正的状态流转仍走 ActivityService.markSuccessIfReached 的 CAS。
+     */
+    @Select("SELECT a.* FROM group_activity a WHERE a.status = 'ONGOING' AND "
+            + "COALESCE((SELECT SUM(o.quantity) FROM group_order o "
+            + "WHERE o.activity_id = a.id AND o.status = 'PAID'), 0) >= a.total_stock")
+    List<GroupActivity> selectReachedPaidTotal();
 }
