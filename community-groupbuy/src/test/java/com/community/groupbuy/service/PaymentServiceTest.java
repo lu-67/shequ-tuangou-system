@@ -136,12 +136,17 @@ class PaymentServiceTest {
         when(paymentMapper.markCallbackSuccess("PAY100", Constants.PAY_PENDING, Constants.PAY_SUCCESS)).thenReturn(1);
         when(orderMapper.selectById(100L)).thenReturn(order);
         when(orderMapper.updateStatusCAS(100L, Constants.ORDER_UNPAID, Constants.ORDER_PAID)).thenReturn(1);
+        // 已参团份数用已支付订单汇总（不新增字段），支付成功自动 +1 份
+        when(orderMapper.sumPaidQuantity(200L)).thenReturn(3L);
 
         boolean ok = paymentService.handleCallback(callback("PAY100", "1", "39.90", true));
 
         assertThat(ok).isTrue();
         verify(orderMapper).updateStatusCAS(100L, Constants.ORDER_UNPAID, Constants.ORDER_PAID);
-        verify(activityService).markSuccessIfSoldOut(200L);
+        verify(orderMapper).sumPaidQuantity(200L);
+        // 实时成团判定：口径统一为「已参团份数」，交由 ActivityService 的 CAS 判定；
+        // 未达标只是返回 false，M8 定时任务继续兜底，两条路径幂等不冲突
+        verify(activityService).markSuccessIfReached(200L);
     }
 
     @Test
@@ -203,7 +208,7 @@ class PaymentServiceTest {
         boolean ok = paymentService.handleCallback(callback("PAY100", "1", "39.90", true));
 
         assertThat(ok).isTrue();
-        verify(activityService, never()).markSuccessIfSoldOut(anyLong());
+        verify(orderMapper, never()).sumPaidQuantity(anyLong());
     }
 
     @Test

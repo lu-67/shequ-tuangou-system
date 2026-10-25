@@ -7,6 +7,7 @@ import com.community.groupbuy.dto.CreateActivityDTO;
 import com.community.groupbuy.dto.PageResult;
 import com.community.groupbuy.entity.GroupActivity;
 import com.community.groupbuy.mapper.ActivityMapper;
+import com.community.groupbuy.mapper.OrderMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -33,13 +34,17 @@ import static org.mockito.Mockito.when;
  * M2 开团活动 Service 单元测试（Mockito，不启动 Spring 容器，不依赖数据库）
  *
  * 覆盖：创建成功/居民越权/参数非法（库存/价格/时间）、状态合法流转、
- *       非法流转、活动不存在、并发 CAS 冲突、分页查询、进行中列表、售罄成团。
+ *       非法流转、活动不存在、并发 CAS 冲突、分页查询、进行中列表、
+ *       成团判定（达标/未达标/库存抢光但未支付/非ONGOING/CAS冲突/活动不存在）。
  */
 @ExtendWith(MockitoExtension.class)
 class ActivityServiceTest {
 
     @Mock
     private ActivityMapper activityMapper;
+
+    @Mock
+    private OrderMapper orderMapper;
 
     @InjectMocks
     private ActivityService activityService;
@@ -222,21 +227,64 @@ class ActivityServiceTest {
         assertThat(list.get(0).getStatus()).isEqualTo("ONGOING");
     }
 
-    /** 售罄即成团：库存为 0 的 ONGOING 活动被判定为 SUCCESS */
+    /** 成团判定：已参团份数达到 total_stock → SUCCESS */
     @Test
-    void markSuccessIfSoldOut_success() {
+    void markSuccessIfReached_reached_becomesSuccess() {
         when(activityMapper.selectById(4L)).thenReturn(activityOf(4L, Constants.ACTIVITY_ONGOING, 0));
+        when(orderMapper.sumPaidQuantity(4L)).thenReturn(1000L);
         when(activityMapper.updateStatusCAS(4L, "ONGOING", "SUCCESS")).thenReturn(1);
 
-        assertThat(activityService.markSuccessIfSoldOut(4L)).isTrue();
+        assertThat(activityService.markSuccessIfReached(4L)).isTrue();
+        verify(activityMapper).updateStatusCAS(4L, Constants.ACTIVITY_ONGOING, Constants.ACTIVITY_SUCCESS);
     }
 
-    /** 售罄判定：仍有库存时不流转 */
+    /** 未达标：已参团份数仍小于 total_stock，不流转 */
     @Test
-    void markSuccessIfSoldOut_stockRemain_noTransfer() {
+    void markSuccessIfReached_notReached_noTransfer() {
         when(activityMapper.selectById(5L)).thenReturn(activityOf(5L, Constants.ACTIVITY_ONGOING, 10));
+        when(orderMapper.sumPaidQuantity(5L)).thenReturn(999L);
 
-        assertThat(activityService.markSuccessIfSoldOut(5L)).isFalse();
+        assertThat(activityService.markSuccessIfReached(5L)).isFalse();
         verify(activityMapper, never()).updateStatusCAS(eq(5L), anyString(), anyString());
+    }
+
+    /**
+     * 口径校验：哪怕库存已被抢光（stock = 0），只要已支付份数不够就不成团。
+     * 这正是「已参团份数」与「total_stock - stock」两个口径的区别。
+     */
+    @Test
+    void markSuccessIfReached_stockZeroButUnpaid_noTransfer() {
+        when(activityMapper.selectById(6L)).thenReturn(activityOf(6L, Constants.ACTIVITY_ONGOING, 0));
+        when(orderMapper.sumPaidQuantity(6L)).thenReturn(880L);
+
+        assertThat(activityService.markSuccessIfReached(6L)).isFalse();
+    }
+
+    /** 非 ONGOING（待上架或已终态）活动不参与成团判定 */
+    @Test
+    void markSuccessIfReached_notOngoing_noTransfer() {
+        when(activityMapper.selectById(7L)).thenReturn(activityOf(7L, Constants.ACTIVITY_PENDING, 1000));
+
+        assertThat(activityService.markSuccessIfReached(7L)).isFalse();
+        verify(orderMapper, never()).sumPaidQuantity(anyLong());
+    }
+
+    /** 并发下 CAS 未抢到（状态已被其他流程改过）：返回 false，不报错 */
+    @Test
+    void markSuccessIfReached_casConflict_returnsFalse() {
+        when(activityMapper.selectById(8L)).thenReturn(activityOf(8L, Constants.ACTIVITY_ONGOING, 0));
+        when(orderMapper.sumPaidQuantity(8L)).thenReturn(1000L);
+        when(activityMapper.updateStatusCAS(8L, "ONGOING", "SUCCESS")).thenReturn(0);
+
+        assertThat(activityService.markSuccessIfReached(8L)).isFalse();
+    }
+
+    /** 活动不存在：返回 false（定时任务批量扫描时不应中断整批） */
+    @Test
+    void markSuccessIfReached_activityNotFound_returnsFalse() {
+        when(activityMapper.selectById(99L)).thenReturn(null);
+
+        assertThat(activityService.markSuccessIfReached(99L)).isFalse();
+        verify(activityMapper, never()).updateStatusCAS(anyLong(), anyString(), anyString());
     }
 }
