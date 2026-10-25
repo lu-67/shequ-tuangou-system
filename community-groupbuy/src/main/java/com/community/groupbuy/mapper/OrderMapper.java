@@ -9,6 +9,7 @@ import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 /**
@@ -46,4 +47,16 @@ public interface OrderMapper {
             + "pay_time = CASE WHEN #{to} = 'PAID' THEN NOW() ELSE pay_time END "
             + "WHERE id = #{id} AND status = #{from}")
     int updateStatusCAS(@Param("id") Long id, @Param("from") String from, @Param("to") String to);
+
+    /**
+     * M4：活动「已参团份数」= 已支付订单的购买数量汇总。
+     * 不新增字段（约定：不改表结构），支付成功一笔该值自动 +1 份。
+     */
+    @Select("SELECT COALESCE(SUM(quantity), 0) FROM group_order WHERE activity_id = #{activityId} AND status = 'PAID'")
+    long sumPaidQuantity(@Param("activityId") Long activityId);
+
+    /** M8：超时仍未支付的订单（下单时间早于截止时间），供定时任务取消并回补库存 */
+    @Select("SELECT * FROM group_order WHERE status = 'UNPAID' AND create_time < #{deadline} "
+            + "ORDER BY id ASC LIMIT 500")
+    List<GroupOrder> selectTimeoutUnpaid(@Param("deadline") LocalDateTime deadline);
 }

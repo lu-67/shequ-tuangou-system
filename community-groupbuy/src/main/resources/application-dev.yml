@@ -31,3 +31,6 @@ app:
     secret: community-groupbuy-pay-dev-secret-2026
     # M8 定时任务：超时未支付订单自动取消的分钟数
     timeout-minutes: 15
+  # M8 定时任务总开关（测试/调试时可关）
+  scheduler:
+    enabled: true
