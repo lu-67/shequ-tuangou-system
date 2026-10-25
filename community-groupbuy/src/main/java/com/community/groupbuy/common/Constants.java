@@ -41,4 +41,9 @@ public final class Constants {
     public static final String REDIS_RATE_LIMIT_PREFIX = "groupbuy:ratelimit:order:";
     /** 默认令牌桶容量 */
     public static final int RATE_LIMIT_CAPACITY = 200;
+
+    /** 默认支付渠道（M4） */
+    public static final String PAY_CHANNEL_WECHAT = "WECHAT";
+    /** 支付流水号前缀（按订单维度固定：PAY{orderId}，保证重复支付命中同一笔流水） */
+    public static final String PAY_NO_PREFIX = "PAY";
 }

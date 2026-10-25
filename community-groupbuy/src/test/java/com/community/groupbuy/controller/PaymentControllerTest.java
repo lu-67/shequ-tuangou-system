@@ -184,7 +184,7 @@ class PaymentControllerTest {
                         .with(user(resident(5L))))
                 .andExpect(status().isOk())
                 .andReturn();
-        JsonNode list = objectMapper.readTree(payResult.getResponse().getContentAsString()).get("data");
+        JsonNode list = objectMapper.readTree(payResult.getResponse().getContentAsString()).get("data").get("list");
         long paymentId = list.get(0).get("id").asLong();
 
         mockMvc.perform(post("/api/payments/" + paymentId + "/refund")

@@ -3,6 +3,7 @@ package com.community.groupbuy.controller;
 import com.community.groupbuy.common.Result;
 import com.community.groupbuy.common.SecurityUtils;
 import com.community.groupbuy.dto.CreatePaymentDTO;
+import com.community.groupbuy.dto.PageResult;
 import com.community.groupbuy.dto.PaymentCallbackDTO;
 import com.community.groupbuy.dto.PaymentQueryDTO;
 import com.community.groupbuy.entity.Payment;
@@ -15,8 +16,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-
-import java.util.List;
 
 /**
  * M4 支付与成团（支付幂等 / 回调防重入账 / 退款回补库存）
@@ -59,8 +58,9 @@ public class PaymentController {
 
     /** 支付记录列表（动态条件 + 分页） */
     @GetMapping
-    public Result<List<Payment>> list(PaymentQueryDTO query) {
-        return Result.success(paymentService.list(query));
+    public Result<PageResult<Payment>> list(PaymentQueryDTO query) {
+        return Result.success(PageResult.of(paymentService.count(query), query.getPageNum(), query.getPageSize(),
+                paymentService.list(query)));
     }
 
     /**

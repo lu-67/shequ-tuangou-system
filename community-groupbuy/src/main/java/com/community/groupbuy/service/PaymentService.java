@@ -66,7 +66,7 @@ public class PaymentService {
         payment.setOrderId(order.getId());
         payment.setOrderNo(order.getOrderNo());
         payment.setAmount(order.getAmount());
-        payment.setChannel(channel == null || channel.isEmpty() ? "WECHAT" : channel);
+        payment.setChannel(channel == null || channel.isEmpty() ? Constants.PAY_CHANNEL_WECHAT : channel);
         payment.setStatus(Constants.PAY_PENDING);
         paymentMapper.insert(payment);
 
@@ -195,7 +195,7 @@ public class PaymentService {
 
     /** 支付流水号按订单维度固定，保证重复支付命中同一笔流水 */
     private String buildPayNo(Long orderId) {
-        return "PAY" + orderId;
+        return Constants.PAY_NO_PREFIX + orderId;
     }
 
     private GroupOrder requireOrder(Long orderId) {
