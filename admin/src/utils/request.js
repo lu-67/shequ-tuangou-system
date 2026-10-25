@@ -24,7 +24,10 @@ request.interceptors.response.use(
     if (res && res.code === 200) {
       return res.data
     }
-    ElMessage.error((res && res.message) || '请求失败')
+    // silent: true 时不弹全局错误提示（用于"接口尚未实现"的降级场景）
+    if (!(response.config && response.config.silent)) {
+      ElMessage.error((res && res.message) || '请求失败')
+    }
     return Promise.reject(new Error((res && res.message) || 'Error'))
   },
   (error) => {
@@ -35,7 +38,10 @@ request.interceptors.response.use(
       router.push('/login')
     } else {
       const msg = error.response && error.response.data && error.response.data.message
-      ElMessage.error(msg || '网络错误，请确认后端已启动')
+      // silent: true 时不弹全局错误提示
+      if (!(error.config && error.config.silent)) {
+        ElMessage.error(msg || '网络错误，请确认后端已启动')
+      }
     }
     return Promise.reject(error)
   }

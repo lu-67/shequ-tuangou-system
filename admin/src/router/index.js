@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import Layout from '../layout/Layout.vue'
+import Activity from '../views/Activity.vue'
 
 /**
  * 管理后台路由（当前为骨架状态）。
@@ -15,9 +16,13 @@ const routes = [
   {
     path: '/',
     component: Layout,
-    children: []
+    redirect: '/activities',
+    children: [
+      // B 同学：M2 开团活动（页面已从 baseline 恢复）
+      { path: 'activities', name: 'Activity', component: Activity, meta: { title: '开团活动管理' } }
+    ]
   },
-  { path: '/:pathMatch(.*)*', redirect: '/' }
+  { path: '/:pathMatch(.*)*', redirect: '/activities' }
 ]
 
 const router = createRouter({
