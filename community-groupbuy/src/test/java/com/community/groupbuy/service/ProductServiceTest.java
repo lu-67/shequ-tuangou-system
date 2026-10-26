@@ -40,6 +40,10 @@ class ProductServiceTest {
     @Mock
     private ProductMapper productMapper;
 
+    /** M7 依赖：商品详情缓存（C 同学） */
+    @Mock
+    private CacheService cacheService;
+
     @InjectMocks
     private ProductService productService;
 

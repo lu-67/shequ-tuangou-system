@@ -46,6 +46,13 @@ class ActivityServiceTest {
     @Mock
     private OrderMapper orderMapper;
 
+    /** M7 依赖：库存预热与缓存（C 同学） */
+    @Mock
+    private StockCacheService stockCacheService;
+
+    @Mock
+    private CacheService cacheService;
+
     @InjectMocks
     private ActivityService activityService;
 
@@ -286,5 +293,41 @@ class ActivityServiceTest {
 
         assertThat(activityService.markSuccessIfReached(99L)).isFalse();
         verify(activityMapper, never()).updateStatusCAS(anyLong(), anyString(), anyString());
+    }
+
+    /** M7：流转到 ONGOING 时预热库存（把 DB stock 写入 Redis） */
+    @Test
+    void updateStatus_toOngoing_preheatsStock() {
+        when(activityMapper.selectById(2L)).thenReturn(activityOf(2L, Constants.ACTIVITY_PENDING, 1000));
+        when(activityMapper.updateStatusCAS(2L, "PENDING", "ONGOING")).thenReturn(1);
+
+        activityService.updateStatus(2L, Constants.ACTIVITY_ONGOING, Constants.ROLE_HEAD);
+
+        verify(stockCacheService).preheat(2L, 1000);
+        verify(stockCacheService, never()).evict(anyLong());
+    }
+
+    /** M7：流转到 SUCCESS 时清除库存预热 */
+    @Test
+    void updateStatus_toSuccess_evictsStockCache() {
+        when(activityMapper.selectById(3L)).thenReturn(activityOf(3L, Constants.ACTIVITY_ONGOING, 0));
+        when(activityMapper.updateStatusCAS(3L, "ONGOING", "SUCCESS")).thenReturn(1);
+
+        activityService.updateStatus(3L, Constants.ACTIVITY_SUCCESS, Constants.ROLE_ADMIN);
+
+        verify(stockCacheService).evict(3L);
+        verify(stockCacheService, never()).preheat(anyLong(), any());
+    }
+
+    /** M7：成团判定成功后同样清除库存预热，避免活动结束后还能被预扣 */
+    @Test
+    void markSuccessIfReached_reached_evictsStockCache() {
+        when(activityMapper.selectById(9L)).thenReturn(activityOf(9L, Constants.ACTIVITY_ONGOING, 0));
+        when(orderMapper.sumPaidQuantity(9L)).thenReturn(1000L);
+        when(activityMapper.updateStatusCAS(9L, "ONGOING", "SUCCESS")).thenReturn(1);
+
+        assertThat(activityService.markSuccessIfReached(9L)).isTrue();
+
+        verify(stockCacheService).evict(9L);
     }
 }

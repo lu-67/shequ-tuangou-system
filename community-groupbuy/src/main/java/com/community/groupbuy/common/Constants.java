@@ -46,4 +46,21 @@ public final class Constants {
     public static final String PAY_CHANNEL_WECHAT = "WECHAT";
     /** 支付流水号前缀（按订单维度固定：PAY{orderId}，保证重复支付命中同一笔流水） */
     public static final String PAY_NO_PREFIX = "PAY";
+
+    /** M7（C 同学）缓存 key 前缀：商品详情 */
+    public static final String REDIS_CACHE_PRODUCT_PREFIX = "groupbuy:cache:product:";
+    /** M7 缓存 key 前缀：活动详情 */
+    public static final String REDIS_CACHE_ACTIVITY_PREFIX = "groupbuy:cache:activity:";
+    /** M7 缓存回源分布式锁前缀 */
+    public static final String REDIS_CACHE_LOCK_PREFIX = "groupbuy:lock:cache:";
+    /** M7 商品详情缓存基础 TTL（秒），实际写入会叠加随机值防雪崩 */
+    public static final long CACHE_PRODUCT_TTL_SECONDS = 60L;
+    /** M7 活动详情缓存基础 TTL（秒），活动库存变化频繁，TTL 取小值 */
+    public static final long CACHE_ACTIVITY_TTL_SECONDS = 20L;
+    /** M7 回源锁持有时长（毫秒），防止持锁线程崩溃导致死锁 */
+    public static final long CACHE_LOCK_TTL_MILLIS = 3000L;
+    /** M7 未抢到锁时的最长等待时间（毫秒），超时降级为直接查库 */
+    public static final long CACHE_LOCK_WAIT_MILLIS = 500L;
+    /** M7 未抢到锁时的轮询间隔（毫秒） */
+    public static final long CACHE_LOCK_SPIN_MILLIS = 20L;
 }

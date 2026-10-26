@@ -28,6 +28,12 @@ public class ActivityService {
 
     private final OrderMapper orderMapper;
 
+    /** M7：库存预热 / 清除（C 同学） */
+    private final StockCacheService stockCacheService;
+
+    /** M7：活动详情 Cache-Aside（C 同学） */
+    private final CacheService cacheService;
+
     /**
      * 创建开团活动（团长 / 管理员）。
      * 新建活动为 PENDING，需调用 updateStatus 流转到 ONGOING 后才可被参团下单。
@@ -38,6 +44,10 @@ public class ActivityService {
         validateCreateParam(dto);
         GroupActivity activity = buildActivity(dto);
         activityMapper.insert(activity);
+        // M7：初始状态若已是 ONGOING，立即预热库存（当前创建固定 PENDING，此处为保护性判断）
+        if (Constants.ACTIVITY_ONGOING.equals(activity.getStatus())) {
+            stockCacheService.preheat(activity.getId(), activity.getStock());
+        }
         log.info("开团活动创建成功: id={}, title={}, operatorId={}", activity.getId(), activity.getTitle(), operatorId);
         return activity.getId();
     }
@@ -57,11 +67,19 @@ public class ActivityService {
         if (rows != 1) {
             throw new BusinessException(ResultCode.ACTIVITY_STATUS_ERROR, "活动状态已被其他操作变更，请刷新后重试");
         }
+        // M7：进入 ONGOING 预热库存；SUCCESS/FAILED 清除预热；活动详情缓存一律失效
+        syncStockCacheOnTransfer(activity, target);
+        cacheService.evict(Constants.REDIS_CACHE_ACTIVITY_PREFIX + activityId);
         log.info("活动状态流转成功: id={}, {} -> {}, operator={}", activityId, current.name(), target.name(), operatorRole);
     }
 
+    /**
+     * 活动详情（M7 缓存）：Cache-Aside + 分布式锁回源 + 随机 TTL。
+     * 库存变化频繁，TTL 取 20 秒；状态流转会主动失效该 key。
+     */
     public GroupActivity getActivity(Long activityId) {
-        return requireActivity(activityId);
+        return cacheService.getOrLoad(Constants.REDIS_CACHE_ACTIVITY_PREFIX + activityId, GroupActivity.class,
+                Constants.CACHE_ACTIVITY_TTL_SECONDS, () -> requireActivity(activityId));
     }
 
     /** 动态条件分页查询 */
@@ -101,14 +119,25 @@ public class ActivityService {
         }
         int rows = activityMapper.updateStatusCAS(activityId, Constants.ACTIVITY_ONGOING, Constants.ACTIVITY_SUCCESS);
         if (rows == 1) {
+            // M7：已成团，清除库存预热与详情缓存（活动不再接受下单）
+            stockCacheService.evict(activityId);
+            cacheService.evict(Constants.REDIS_CACHE_ACTIVITY_PREFIX + activityId);
             log.info("活动已成团: activityId={}, 已参团={}/{}",
                     activityId, joinedQuantity, activity.getTotalStock());
         }
         return rows == 1;
     }
 
-    private GroupActivity requireActivity(Long activityId) {
-        GroupActivity activity = activityMapper.selectById(activityId);
+    /** M7：状态流转后同步库存缓存（ONGOING 预热，SUCCESS/FAILED 清除） */
+    private void syncStockCacheOnTransfer(GroupActivity activity, ActivityStatus target) {
+        if (target == ActivityStatus.ONGOING) {
+            stockCacheService.preheat(activity.getId(), activity.getStock());
+        } else if (target == ActivityStatus.SUCCESS || target == ActivityStatus.FAILED) {
+            stockCacheService.evict(activity.getId());
+        }
+    }
+
+    private GroupActivity requireActivity(Long activityId) {        GroupActivity activity = activityMapper.selectById(activityId);
         if (activity == null) {
             throw new BusinessException(ResultCode.ACTIVITY_NOT_FOUND);
         }
