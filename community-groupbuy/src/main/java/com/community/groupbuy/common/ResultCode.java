@@ -20,6 +20,11 @@ public enum ResultCode {
     USER_EXISTS(1001, "用户名已存在"),
     USER_NOT_FOUND(1002, "用户不存在"),
     PASSWORD_ERROR(1003, "账号或密码错误"),
+    // M1 商品段（C 同学）：追加在 1000 段末尾，不动上面已有行号
+    PRODUCT_NOT_FOUND(1101, "商品不存在"),
+    PRODUCT_PRICE_ERROR(1102, "团购价不能高于原价"),
+    PRODUCT_STATUS_ERROR(1103, "商品状态非法"),
+    PRODUCT_REFERENCED(1104, "商品已被团购活动引用，不可删除"),
     ACTIVITY_NOT_FOUND(2001, "团购活动不存在"),
     ACTIVITY_NOT_ONGOING(2002, "活动未在进行中"),
     STOCK_NOT_ENOUGH(2003, "库存不足/已抢光"),
@@ -31,6 +36,9 @@ public enum ResultCode {
     PAY_AMOUNT_MISMATCH(3005, "支付金额与订单金额不一致"),
     VERIFY_CODE_INVALID(4001, "核销码无效"),
     VERIFY_ALREADY_DONE(4002, "该订单已核销，不可重复核销"),
+    // M5 自提点段（C 同学）：追加在 4000 段末尾
+    PICKUP_POINT_NOT_FOUND(4101, "自提点不存在"),
+    PICKUP_POINT_REFERENCED(4102, "自提点已有核销记录，不可删除"),
     RATE_LIMIT(5001, "请求过于频繁，请稍后再试"),
     ;
 
