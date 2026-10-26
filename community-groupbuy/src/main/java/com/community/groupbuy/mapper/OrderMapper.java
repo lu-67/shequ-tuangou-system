@@ -59,4 +59,11 @@ public interface OrderMapper {
     @Select("SELECT * FROM group_order WHERE status = 'UNPAID' AND create_time < #{deadline} "
             + "ORDER BY id ASC LIMIT 500")
     List<GroupOrder> selectTimeoutUnpaid(@Param("deadline") LocalDateTime deadline);
+
+    /**
+     * M5（C 同学追加）：按核销码查订单，核销接口入口。
+     * verification_code 有唯一索引，最多命中一条；查不到说明核销码无效。
+     */
+    @Select("SELECT * FROM group_order WHERE verification_code = #{code}")
+    GroupOrder selectByVerificationCode(@Param("code") String code);
 }
