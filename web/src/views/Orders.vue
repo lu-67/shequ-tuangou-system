@@ -108,7 +108,7 @@ function load() {
   loading.value = true
   Promise.all([
     request.get('/orders/my'),
-    request.get('/activities'),
+    request.get('/activities/ongoing'),
     request.get('/pickup/points')
   ])
     .then(([orders, acts, pts]) => {
