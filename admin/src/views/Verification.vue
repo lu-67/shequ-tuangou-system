@@ -109,7 +109,7 @@ function submit() {
         success: true,
         code: form.verificationCode.trim(),
         pointName: point ? point.name : `#${form.pickupPointId}`,
-        message: `核销记录 ID ${id}`,
+        message: `订单 ID ${id} 核销完成`,
         time: now()
       }
       ElMessage.success('核销成功')
