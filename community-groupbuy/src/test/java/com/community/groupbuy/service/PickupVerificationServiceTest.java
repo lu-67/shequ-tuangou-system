@@ -32,8 +32,10 @@ import static org.mockito.Mockito.when;
 /**
  * M5 自提核销 Service 单元测试（Mockito）
  *
- * 覆盖：核销成功、核销码不存在、订单未支付、订单已核销、并发 CAS 失败（影响行数 0）、
- *       自提点不存在、居民越权、唯一索引兜底冲突。
+ * 核销语义（方案 A）：更新预置 PENDING 记录为 DONE。
+ * 覆盖：核销成功、核销码不存在、订单未支付、订单已核销、并发 CAS 失败、
+ *       PENDING 记录已被核销（UPDATE 0 行 + 记录存在）、
+ *       无预置记录兜底 INSERT、唯一索引冲突、自提点不存在、居民越权。
  */
 @ExtendWith(MockitoExtension.class)
 class PickupVerificationServiceTest {
@@ -74,26 +76,19 @@ class PickupVerificationServiceTest {
         return point;
     }
 
-    /** 核销成功：订单 PAID → PICKED，写入 DONE 记录 */
+    /** 核销成功：订单 PAID → PICKED，预置 PENDING 记录被更新为 DONE */
     @Test
-    void verify_success_returnsRecordId() {
+    void verify_success_returnsOrderId() {
         when(pickupPointMapper.selectById(1L)).thenReturn(pointOf());
         when(orderMapper.selectByVerificationCode("CG10000001")).thenReturn(orderOf(Constants.ORDER_PAID));
         when(orderMapper.updateStatusCAS(1L, Constants.ORDER_PAID, Constants.ORDER_PICKED)).thenReturn(1);
-        doAnswer(invocation -> {
-            PickupVerification arg = invocation.getArgument(0);
-            arg.setId(88L);
-            return 1;
-        }).when(pickupVerificationMapper).insert(any(PickupVerification.class));
+        when(pickupVerificationMapper.updateToDone(1L, 1L)).thenReturn(1);
 
-        Long id = verificationService.verify(dto(), Constants.ROLE_HEAD);
+        Long orderId = verificationService.verify(dto(), Constants.ROLE_HEAD);
 
-        assertThat(id).isEqualTo(88L);
-        ArgumentCaptor<PickupVerification> captor = ArgumentCaptor.forClass(PickupVerification.class);
-        verify(pickupVerificationMapper).insert(captor.capture());
-        assertThat(captor.getValue().getStatus()).isEqualTo(Constants.VERIFY_DONE);
-        assertThat(captor.getValue().getOrderId()).isEqualTo(1L);
-        assertThat(captor.getValue().getPickupPointId()).isEqualTo(1L);
+        assertThat(orderId).isEqualTo(1L);
+        verify(pickupVerificationMapper).updateToDone(1L, 1L);
+        verify(pickupVerificationMapper, never()).insert(any(PickupVerification.class));
     }
 
     /** 异常分支：核销码不存在 */
@@ -131,7 +126,7 @@ class PickupVerificationServiceTest {
                 .hasFieldOrPropertyWithValue("code", ResultCode.VERIFY_ALREADY_DONE.getCode());
     }
 
-    /** 并发场景：CAS 影响行数 0，说明已被其他请求核销 */
+    /** 并发场景：订单状态 CAS 影响行数 0，说明已被其他请求核销 */
     @Test
     void verify_casFailed_throws4002() {
         when(pickupPointMapper.selectById(1L)).thenReturn(pointOf());
@@ -141,15 +136,59 @@ class PickupVerificationServiceTest {
         assertThatThrownBy(() -> verificationService.verify(dto(), Constants.ROLE_ADMIN))
                 .isInstanceOf(BusinessException.class)
                 .hasFieldOrPropertyWithValue("code", ResultCode.VERIFY_ALREADY_DONE.getCode());
-        verify(pickupVerificationMapper, never()).insert(any(PickupVerification.class));
+        verify(pickupVerificationMapper, never()).updateToDone(anyLong(), anyLong());
     }
 
-    /** 唯一索引兜底：插入核销记录冲突同样按重复核销处理 */
+    /** UPDATE 影响 0 行且记录存在（已非 PENDING，说明已被核销）→ 4002 */
     @Test
-    void verify_duplicateKey_throws4002() {
+    void verify_pendingRecordAlreadyDone_throws4002() {
         when(pickupPointMapper.selectById(1L)).thenReturn(pointOf());
         when(orderMapper.selectByVerificationCode("CG10000001")).thenReturn(orderOf(Constants.ORDER_PAID));
         when(orderMapper.updateStatusCAS(1L, Constants.ORDER_PAID, Constants.ORDER_PICKED)).thenReturn(1);
+        when(pickupVerificationMapper.updateToDone(1L, 1L)).thenReturn(0);
+
+        PickupVerification done = new PickupVerification();
+        done.setOrderId(1L);
+        done.setStatus(Constants.VERIFY_DONE);
+        when(pickupVerificationMapper.selectByOrderId(1L)).thenReturn(done);
+
+        assertThatThrownBy(() -> verificationService.verify(dto(), Constants.ROLE_ADMIN))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("code", ResultCode.VERIFY_ALREADY_DONE.getCode());
+        verify(pickupVerificationMapper, never()).insert(any(PickupVerification.class));
+    }
+
+    /** 无预置 PENDING 记录的订单（如 M4 真实支付流）→ INSERT 兜底，核销成功 */
+    @Test
+    void verify_noPresetRecord_insertsFallbackRecord() {
+        when(pickupPointMapper.selectById(1L)).thenReturn(pointOf());
+        when(orderMapper.selectByVerificationCode("CG10000001")).thenReturn(orderOf(Constants.ORDER_PAID));
+        when(orderMapper.updateStatusCAS(1L, Constants.ORDER_PAID, Constants.ORDER_PICKED)).thenReturn(1);
+        when(pickupVerificationMapper.updateToDone(1L, 1L)).thenReturn(0);
+        when(pickupVerificationMapper.selectByOrderId(1L)).thenReturn(null);
+        doAnswer(invocation -> {
+            PickupVerification arg = invocation.getArgument(0);
+            arg.setId(88L);
+            return 1;
+        }).when(pickupVerificationMapper).insert(any(PickupVerification.class));
+
+        Long orderId = verificationService.verify(dto(), Constants.ROLE_ADMIN);
+
+        assertThat(orderId).isEqualTo(1L);
+        ArgumentCaptor<PickupVerification> captor = ArgumentCaptor.forClass(PickupVerification.class);
+        verify(pickupVerificationMapper).insert(captor.capture());
+        assertThat(captor.getValue().getStatus()).isEqualTo(Constants.VERIFY_DONE);
+        assertThat(captor.getValue().getVerificationCode()).isEqualTo("CG10000001");
+    }
+
+    /** 唯一索引兜底：兜底 INSERT 冲突同样按重复核销处理 */
+    @Test
+    void verify_fallbackInsertDuplicateKey_throws4002() {
+        when(pickupPointMapper.selectById(1L)).thenReturn(pointOf());
+        when(orderMapper.selectByVerificationCode("CG10000001")).thenReturn(orderOf(Constants.ORDER_PAID));
+        when(orderMapper.updateStatusCAS(1L, Constants.ORDER_PAID, Constants.ORDER_PICKED)).thenReturn(1);
+        when(pickupVerificationMapper.updateToDone(1L, 1L)).thenReturn(0);
+        when(pickupVerificationMapper.selectByOrderId(1L)).thenReturn(null);
         doThrow(new DuplicateKeyException("uk_order_id")).when(pickupVerificationMapper)
                 .insert(any(PickupVerification.class));
 
