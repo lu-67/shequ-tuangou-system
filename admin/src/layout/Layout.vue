@@ -19,11 +19,16 @@
           <el-icon><Goods /></el-icon>
           <span>商品管理</span>
         </el-menu-item>
+        <!-- C 同学：M5 自提核销 -->
+        <el-menu-item index="/verification">
+          <el-icon><Select /></el-icon>
+          <span>自提核销</span>
+        </el-menu-item>
       </el-menu>
       <div class="menu-tip">
         <p>待其他模块实现：</p>
         <p>· 登录页 / 用户权限 —— D</p>
-        <p>· 自提核销 / 统计 —— C / D</p>
+        <p>· 统计导出 —— D</p>
       </div>
     </el-aside>
 
