@@ -34,6 +34,9 @@ public class ProductService {
 
     private final ProductMapper productMapper;
 
+    /** M7：商品详情 Cache-Aside（C 同学） */
+    private final CacheService cacheService;
+
     /** 新增商品，默认上架 */
     @Transactional(rollbackFor = Exception.class)
     public Long create(ProductDTO dto, String operatorRole) {
@@ -89,8 +92,13 @@ public class ProductService {
         log.info("商品删除成功: id={}, operator={}", id, operatorRole);
     }
 
+    /**
+     * 商品详情（M7 缓存）：Cache-Aside + 分布式锁回源 + 随机 TTL
+     * 热点 key 过期瞬间并发请求，只有抢到锁的线程查库，其余读缓存。
+     */
     public Product getById(Long id) {
-        return requireProduct(id);
+        return cacheService.getOrLoad(Constants.REDIS_CACHE_PRODUCT_PREFIX + id, Product.class,
+                Constants.CACHE_PRODUCT_TTL_SECONDS, () -> requireProduct(id));
     }
 
     /** 动态条件分页查询（管理后台） */
