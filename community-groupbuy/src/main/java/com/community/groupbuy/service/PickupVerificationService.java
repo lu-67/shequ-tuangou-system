@@ -19,13 +19,18 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * M5 自提核销（验收硬指标：同一核销码连续核销 5 次，仅第 1 次成功）
  *
+ * 核销语义（方案 A，与数据模型匹配）：data.sql 为已支付订单预置了 PENDING 核销记录，
+ * 核销 = UPDATE pickup_verification SET status='DONE' WHERE order_id=? AND status='PENDING'。
+ *
  * 幂等设计（三道防线，缺一不可）：
  * 1) 先判断订单状态：已 PICKED → 直接拒绝（4002）；未 PAID → 拒绝（3002）；
  * 2) 数据库状态机 CAS：UPDATE group_order SET status='PICKED' WHERE id=? AND status='PAID'，
  *    影响行数 = 0 说明已被别的请求核销，抛 4002。并发下只有一个线程能改成功；
- * 3) pickup_verification 的 uk_order_id / uk_code 唯一索引兜底，重复插入抛 DuplicateKeyException。
+ * 3) 核销记录 UPDATE ... WHERE status='PENDING' 影响行数=0 时：
+ *    - 已有记录（已被核销）→ 4002；
+ *    - 无记录（如 M4 真实支付流未预置）→ INSERT 兜底，uk_order_id/uk_code 唯一索引再兜一层。
  *
- * 整个过程在同一事务内：核销记录插入失败会回滚订单状态，不会出现"订单已核销但没记录"。
+ * 整个过程在同一事务内，不会出现"订单已核销但没记录"。
  */
 @Slf4j
 @Service
@@ -39,7 +44,7 @@ public class PickupVerificationService {
     private final PickupVerificationMapper pickupVerificationMapper;
 
     /**
-     * 核销：返回核销记录 ID
+     * 核销：返回核销订单 ID
      *
      * @param operatorRole 当前登录人角色，仅 ADMIN / HEAD 可核销
      */
@@ -52,27 +57,42 @@ public class PickupVerificationService {
         assertCanVerify(order);
 
         // 核心：数据库状态机 CAS，并发下仅一个请求能把 PAID 改成 PICKED
-        int rows = orderMapper.updateStatusCAS(order.getId(), Constants.ORDER_PAID, Constants.ORDER_PICKED);
-        if (rows != 1) {
+        int orderRows = orderMapper.updateStatusCAS(order.getId(), Constants.ORDER_PAID, Constants.ORDER_PICKED);
+        if (orderRows != 1) {
             throw new BusinessException(ResultCode.VERIFY_ALREADY_DONE);
         }
 
-        PickupVerification record = new PickupVerification();
-        record.setOrderId(order.getId());
-        record.setVerificationCode(order.getVerificationCode());
-        record.setPickupPointId(point.getId());
-        record.setStatus(Constants.VERIFY_DONE);
-        try {
-            pickupVerificationMapper.insert(record);
-        } catch (DuplicateKeyException e) {
-            // 唯一索引兜底：同一订单/核销码已有记录，事务回滚上面的状态变更
-            log.warn("核销记录唯一索引冲突: orderId={}, code={}", order.getId(), order.getVerificationCode());
-            throw new BusinessException(ResultCode.VERIFY_ALREADY_DONE);
+        // 方案 A：核销 = 更新预置 PENDING 记录为 DONE
+        int recordRows = pickupVerificationMapper.updateToDone(order.getId(), point.getId());
+        if (recordRows != 1) {
+            resolveZeroRowConflict(order);
         }
 
         log.info("核销成功: orderId={}, orderNo={}, code={}, pickupPoint={}, operator={}",
                 order.getId(), order.getOrderNo(), order.getVerificationCode(), point.getName(), operatorRole);
-        return record.getId();
+        return order.getId();
+    }
+
+    /**
+     * UPDATE 影响 0 行的两种可能：
+     * - 记录存在但已非 PENDING（已被核销）→ 4002；
+     * - 无记录（如 M4 真实支付流未预置）→ INSERT 一条 DONE 记录兜底，唯一索引再兜一层。
+     */
+    private void resolveZeroRowConflict(GroupOrder order) {
+        PickupVerification existing = pickupVerificationMapper.selectByOrderId(order.getId());
+        if (existing != null) {
+            throw new BusinessException(ResultCode.VERIFY_ALREADY_DONE);
+        }
+        PickupVerification record = new PickupVerification();
+        record.setOrderId(order.getId());
+        record.setVerificationCode(order.getVerificationCode());
+        record.setStatus(Constants.VERIFY_DONE);
+        try {
+            pickupVerificationMapper.insert(record);
+        } catch (DuplicateKeyException e) {
+            log.warn("核销记录唯一索引冲突: orderId={}, code={}", order.getId(), order.getVerificationCode());
+            throw new BusinessException(ResultCode.VERIFY_ALREADY_DONE);
+        }
     }
 
     /** 订单状态校验：已核销 / 未支付都不允许核销 */
