@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.community.groupbuy.mapper.ProductMapper">
+
+    <!-- M1 商品列：显式列出，避免新增字段时 SELECT * 带来的隐式耦合 -->
+    <sql id="productColumns">
+        id, name, category, spec, unit, price, group_price, stock, image_url, description, status, create_time
+    </sql>
+
+    <!-- 动态条件片段：名称模糊 / 分类 / 状态 / 团购价区间，供列表与计数复用 -->
+    <sql id="productCondition">
+        <where>
+            <if test="name != null and name != ''">
+                AND name LIKE CONCAT('%', #{name}, '%')
+            </if>
+            <if test="category != null and category != ''">
+                AND category = #{category}
+            </if>
+            <if test="status != null">
+                AND status = #{status}
+            </if>
+            <if test="minPrice != null">
+                AND group_price <![CDATA[ >= ]]> #{minPrice}
+            </if>
+            <if test="maxPrice != null">
+                AND group_price <![CDATA[ <= ]]> #{maxPrice}
+            </if>
+        </where>
+    </sql>
+
+    <!-- M1 动态查询（分页）：条件全部可选，手写 LIMIT 分页 -->
+    <select id="selectByCondition" parameterType="com.community.groupbuy.dto.ProductQueryDTO"
+            resultType="com.community.groupbuy.entity.Product">
+        SELECT <include refid="productColumns"/>
+        FROM product
+        <include refid="productCondition"/>
+        ORDER BY id DESC
+        LIMIT #{offset}, #{size}
+    </select>
+
+    <!-- M1 动态统计：与查询共用条件，保证分页 total 一致 -->
+    <select id="countByCondition" parameterType="com.community.groupbuy.dto.ProductQueryDTO"
+            resultType="long">
+        SELECT COUNT(*) FROM product
+        <include refid="productCondition"/>
+    </select>
+
+    <!-- M1 上架商品（居民端首页 / 开团弹窗商品下拉） -->
+    <select id="selectOnShelf" resultType="com.community.groupbuy.entity.Product">
+        SELECT <include refid="productColumns"/>
+        FROM product
+        WHERE status = 1
+        ORDER BY id DESC
+    </select>
+
+    <!-- M1 新增商品，主键回填 -->
+    <insert id="insert" parameterType="com.community.groupbuy.entity.Product"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO product(name, category, spec, unit, price, group_price, stock, image_url, description, status)
+        VALUES(#{name}, #{category}, #{spec}, #{unit}, #{price}, #{groupPrice}, #{stock},
+               #{imageUrl}, #{description}, #{status})
+    </insert>
+
+    <!-- M1 更新商品（全字段，create_time 不覆盖） -->
+    <update id="update" parameterType="com.community.groupbuy.entity.Product">
+        UPDATE product
+        SET name        = #{name},
+            category    = #{category},
+            spec        = #{spec},
+            unit        = #{unit},
+            price       = #{price},
+            group_price = #{groupPrice},
+            stock       = #{stock},
+            image_url   = #{imageUrl},
+            description = #{description},
+            status      = #{status}
+        WHERE id = #{id}
+    </update>
+
+    <!-- M1 删除前置校验：该商品是否已被团购活动引用（只读，不改活动模块） -->
+    <select id="countActivityRef" resultType="long">
+        SELECT COUNT(*) FROM group_activity WHERE product_id = #{productId}
+    </select>
+
+</mapper>

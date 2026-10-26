@@ -247,7 +247,8 @@ function soldPercent(a) {
 
 function load() {
   loading.value = true
-  Promise.all([request.get('/activities'), request.get('/products'), request.get('/pickup/points')])
+  // 三个接口均返回数组：进行中活动、上架商品、自提点
+  Promise.all([request.get('/activities/ongoing'), request.get('/products/list'), request.get('/pickup/points')])
     .then(([acts, prods, pts]) => {
       list.value = acts || []
       products.value = prods || []

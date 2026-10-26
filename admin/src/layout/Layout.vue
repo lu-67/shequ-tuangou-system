@@ -14,11 +14,16 @@
           <el-icon><Box /></el-icon>
           <span>开团活动</span>
         </el-menu-item>
+        <!-- C 同学：M1 商品管理 -->
+        <el-menu-item index="/products">
+          <el-icon><Goods /></el-icon>
+          <span>商品管理</span>
+        </el-menu-item>
       </el-menu>
       <div class="menu-tip">
         <p>待其他模块实现：</p>
         <p>· 登录页 / 用户权限 —— D</p>
-        <p>· 商品管理 / 自提核销 / 统计 —— C</p>
+        <p>· 自提核销 / 统计 —— C / D</p>
       </div>
     </el-aside>
 
