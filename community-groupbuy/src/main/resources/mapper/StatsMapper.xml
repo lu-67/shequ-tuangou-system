@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.community.groupbuy.mapper.StatsMapper">
+
+    <!-- 1. 统计接口：手写动态 SQL -->
+    <select id="getOverviewStats" resultType="java.util.Map">
+        SELECT
+        (SELECT COUNT(*) FROM group_order
+        <where>
+            <if test="status != null and status != ''">
+                status = #{status}
+            </if>
+        </where>
+        ) AS totalOrders,
+        (SELECT IFNULL(SUM(amount), 0) FROM group_order
+        <where>
+            <if test="status != null and status != ''">
+                status = #{status}
+            </if>
+        </where>
+        ) AS totalSales
+    </select>
+
+    <!-- 2. 导出接口：手写动态 SQL -->
+    <select id="getOrderListForExport" resultType="java.util.Map">
+        SELECT
+        order_no AS orderNo,
+        user_id AS username,
+        amount AS amount,
+        status AS status,
+        create_time AS createTime
+        FROM group_order
+        <where>
+            <if test="status != null and status != ''">
+                status = #{status}
+            </if>
+        </where>
+        ORDER BY id DESC LIMIT 500
+    </select>
+</mapper>
