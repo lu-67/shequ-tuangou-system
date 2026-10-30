@@ -73,6 +73,20 @@ class StatsControllerTest {
     }
 
     @Test
+    void listOrders_asAdmin_success() throws Exception {
+        mockMvc.perform(get("/api/stats/orders").with(user(adminUser())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data").isArray());
+    }
+
+    @Test
+    void listOrders_asResident_forbidden() throws Exception {
+        mockMvc.perform(get("/api/stats/orders").with(user(residentUser())))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
     void exportOrders_asAdmin_returnsXlsx() throws Exception {
         mockMvc.perform(get("/api/stats/orders/export").with(user(adminUser())))
                 .andExpect(status().isOk())

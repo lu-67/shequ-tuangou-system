@@ -5,6 +5,9 @@ import Product from '../views/Product.vue'
 import Verification from '../views/Verification.vue'
 // 引入你新建的 Login 页面
 import Login from '../views/Login.vue'
+// D 同学：M6 统计导出 —— 数据看板 + 订单管理（含导出）
+import Dashboard from '../views/Dashboard.vue'
+import Order from '../views/Order.vue'
 
 const routes = [
   {
@@ -16,14 +19,16 @@ const routes = [
   {
     path: '/',
     component: Layout,
-    redirect: '/activities',
+    redirect: '/dashboard',
     children: [
+      { path: 'dashboard', name: 'Dashboard', component: Dashboard, meta: { title: '数据看板' } },
       { path: 'activities', name: 'Activity', component: Activity, meta: { title: '开团活动管理' } },
       { path: 'products', name: 'Product', component: Product, meta: { title: '商品管理' } },
+      { path: 'orders', name: 'Order', component: Order, meta: { title: '订单管理' } },
       { path: 'verification', name: 'Verification', component: Verification, meta: { title: '自提核销' } }
     ]
   },
-  { path: '/:pathMatch(.*)*', redirect: '/activities' }
+  { path: '/:pathMatch(.*)*', redirect: '/dashboard' }
 ]
 
 const router = createRouter({

@@ -33,4 +33,14 @@ public class StatsController {
     public void exportOrders(HttpServletResponse response) {
         statsService.exportOrders(response);
     }
+
+    @GetMapping("/orders")
+    @PreAuthorize("hasAnyRole('ADMIN', 'HEAD')")
+    public Map<String, Object> listOrders() {
+        Map<String, Object> result = new HashMap<>();
+        result.put("code", 200);
+        result.put("message", "success");
+        result.put("data", statsService.listOrders());
+        return result;
+    }
 }

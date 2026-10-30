@@ -25,6 +25,12 @@ public class StatsServiceImpl implements StatsService {
     }
 
     @Override
+    public List<Map<String, Object>> listOrders() {
+        List<Map<String, Object>> list = statsMapper.getOrderListForExport(null);
+        return list == null ? new ArrayList<>() : list;
+    }
+
+    @Override
     public void exportOrders(HttpServletResponse response) {
         try {
             response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");

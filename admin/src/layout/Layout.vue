@@ -2,7 +2,6 @@
   <el-container style="height: 100%">
     <el-aside width="210px" style="background: #001529">
       <div class="logo">社区团购后台</div>
-      <!-- B 同学：M2 开团活动页面已实现；其余模块页面待对应组员补充 -->
       <el-menu
         :default-active="activePath"
         background-color="#001529"
@@ -10,6 +9,12 @@
         active-text-color="#fff"
         router
       >
+        <!-- D 同学：M6 统计导出 —— 数据看板 -->
+        <el-menu-item index="/dashboard">
+          <el-icon><DataLine /></el-icon>
+          <span>数据看板</span>
+        </el-menu-item>
+        <!-- B 同学：M2 开团活动 -->
         <el-menu-item index="/activities">
           <el-icon><Box /></el-icon>
           <span>开团活动</span>
@@ -19,17 +24,17 @@
           <el-icon><Goods /></el-icon>
           <span>商品管理</span>
         </el-menu-item>
+        <!-- D 同学：M6 统计导出 —— 订单管理（含导出） -->
+        <el-menu-item index="/orders">
+          <el-icon><List /></el-icon>
+          <span>订单管理</span>
+        </el-menu-item>
         <!-- C 同学：M5 自提核销 -->
         <el-menu-item index="/verification">
           <el-icon><Select /></el-icon>
           <span>自提核销</span>
         </el-menu-item>
       </el-menu>
-      <div class="menu-tip">
-        <p>待其他模块实现：</p>
-        <p>· 登录页 / 用户权限 —— D</p>
-        <p>· 统计导出 —— D</p>
-      </div>
     </el-aside>
 
     <el-container>
@@ -96,15 +101,6 @@ function handleCommand(cmd) {
   font-weight: 700;
   letter-spacing: 1px;
   background: #00284d;
-}
-.menu-tip {
-  padding: 16px;
-  color: #8a94a6;
-  font-size: 12px;
-  line-height: 1.9;
-}
-.menu-tip p {
-  margin: 0;
 }
 .user-area {
   display: flex;
