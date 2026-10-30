@@ -3,16 +3,16 @@ import WebLayout from '../layout/WebLayout.vue'
 import Home from '../views/Home.vue'
 import Orders from '../views/Orders.vue'
 import Mine from '../views/Mine.vue'
+// 引入你等下要创建的登录页
+import Login from '../views/Login.vue'
 
-/**
- * 居民网页端路由。
- *
- * 说明：登录页 /login 属于 M0 用户与权限（D 同学负责），
- * 待 D 同学实现后端 /api/auth/login 与 JWT 后，在此恢复登录路由与登录守卫：
- *   { path: '/login', component: Login }
- *   router.beforeEach：未登录访问非 /login 页面时跳转 /login
- */
 const routes = [
+  {
+    path: '/login',
+    name: 'Login',
+    component: Login,
+    meta: { title: '居民端登录' }
+  },
   {
     // 居民网页端（顶部导航布局）
     path: '/',
@@ -30,6 +30,22 @@ const routes = [
 const router = createRouter({
   history: createWebHistory(),
   routes
+})
+
+// ================= 全局路由守卫（解决 M0 权限拦截） =================
+router.beforeEach((to, from, next) => {
+  const token = localStorage.getItem('token')
+
+  if (to.path !== '/login' && !token) {
+    // 没登录，且想访问首页/订单/个人中心 -> 强制踢到登录页
+    next('/login')
+  } else if (to.path === '/login' && token) {
+    // 已经登录了，还想去登录页 -> 自动跳回首页
+    next('/')
+  } else {
+    // 有 Token 正常放行
+    next()
+  }
 })
 
 export default router

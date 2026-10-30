@@ -105,7 +105,6 @@
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
-
         <!-- Spring Security 测试支持：MockMvc 登录态后置处理器（集成测试用） -->
         <dependency>
             <groupId>org.springframework.security</groupId>
