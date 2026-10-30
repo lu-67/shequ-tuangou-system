@@ -4,6 +4,8 @@ import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.validation.BindException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -48,6 +50,22 @@ public class GlobalExceptionHandler {
         log.warn("请求体解析失败: {}", ex.getMessage());
         return Result.error(ResultCode.PARAM_ERROR.getCode(),
                 "请求参数格式错误，日期时间请使用 yyyy-MM-dd HH:mm:ss 格式");
+    }
+
+    /** 鉴权失败（未登录 / token 失效）：方法级鉴权抛出的 AuthenticationException */
+    @ExceptionHandler(AuthenticationException.class)
+    @ResponseStatus(HttpStatus.UNAUTHORIZED)
+    public Result<Void> handleAuthentication(AuthenticationException ex) {
+        log.warn("鉴权失败: {}", ex.getMessage());
+        return Result.error(ResultCode.UNAUTHORIZED);
+    }
+
+    /** 越权访问：已登录但角色不足（@PreAuthorize 不通过） */
+    @ExceptionHandler(AccessDeniedException.class)
+    @ResponseStatus(HttpStatus.FORBIDDEN)
+    public Result<Void> handleAccessDenied(AccessDeniedException ex) {
+        log.warn("越权访问: {}", ex.getMessage());
+        return Result.error(ResultCode.FORBIDDEN);
     }
 
     /** 其余未捕获异常 */
