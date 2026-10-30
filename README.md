@@ -43,16 +43,18 @@ cd web && npm install && npm run dev          # http://localhost:5174
 | --- | --- | --- |
 | 工程骨架 | 统一响应 Result / 全局异常 / 参数校验 / dev-prod 配置分离 / Knife4j / 数据库脚本 | ✅ 已完成（组长） |
 | M3 参团下单 | Lua 令牌桶限流 → Redis 库存预扣（降级）→ DB CAS 防超卖 → 同事务落订单 + 核销码生成 → 我的订单/详情 | ✅ 已完成（组长，含 12 个测试） |
-| M0 用户与权限 | 注册登录（JWT+BCrypt）、三角色 RBAC | 🔧 开发中 |
+| M0 用户与权限 | Spring Security + JWT + BCrypt 注册登录、三角色 RBAC（ADMIN/HEAD/RESIDENT）、JWT 过滤器鉴权、管理后台与居民端双登录页 | ✅ 已完成（成员 D） |
 | M1 商品管理 | 商品 CRUD + 上下架 + 分页动态查询（手写动态 SQL）、商品被活动引用时禁止删除 | ✅ 已完成（成员 C，14 个单测 + 7 个集成测试） |
 | M2 开团活动 | 开团 CRUD + 活动状态机（枚举 + 转移表 + 非法转移断言）、分页查询、进行中列表、角色校验 | ✅ 已完成（成员 B，19 个单测 + 7 个集成测试） |
 | M4 支付与成团 | 支付幂等、回调 HMAC 验签防重入账、三重 CAS 幂等、退款回补库存 | ✅ 已完成（成员 B，18 个单测 + 5 个集成测试） |
 | M5 自提点与核销 | 自提点 CRUD + 核销记录引用校验；核销码幂等核销（同一码连核 5 次仅第 1 次成功，其余返回 4002） | ✅ 已完成（成员 C，10 个单测 + 6 个集成测试） |
-| M6 统计导出 | 订单查询、汇总统计、EasyExcel 导出 | 🔧 开发中 |
+| M6 统计导出 | 运营大盘（概览统计）、订单数据 EasyExcel 导出（XML 动态 SQL）、统计接口按 ADMIN/HEAD 授权 | ✅ 已完成（成员 D） |
 | M7 缓存与限流 | Cache-Aside + SETNX 分布式锁回源 + 双检 + Lua 释放锁 + 随机 TTL 防雪崩（全程 fail-open）；库存预热（key 与 M3 预扣一致）；商品详情 60s / 活动详情 20s 缓存并在状态流转时主动失效 | ✅ 已完成（成员 C，15 个缓存相关测试，含 100 并发回源验收） |
 | M8 定时任务 | 到期判定 / 达标兜底 / 超时未支付自动取消 + 库存回补（可开关、幂等可重跑） | ✅ 已完成（成员 B，10 个单测） |
 
-已实现接口（详见 `/doc.html`）：`GET /api/orders/{id}`（订单详情）、`GET /api/orders/my`（我的订单，需登录）、`POST /api/orders`（参团下单，需登录）；活动、支付、商品、自提点接口见 `/doc.html`（成员 B/C 提交）。
+已实现接口（详见 `/doc.html`）：`POST /api/auth/login`、`POST /api/auth/register`（登录注册）、`GET /api/orders/{id}`（订单详情）、`GET /api/orders/my`（我的订单，需登录）、`POST /api/orders`（参团下单，需登录）；活动、支付、商品、自提点、统计导出接口见 `/doc.html`（成员 B/C/D 提交）。
+
+> 除登录注册与居民端只读接口（`/api/activities/ongoing`、`/api/products/list`、`/api/pickup/points`）外，其余接口均需携带 `Authorization: Bearer <token>`。
 
 ## 测试
 

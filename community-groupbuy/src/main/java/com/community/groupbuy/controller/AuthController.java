@@ -3,6 +3,8 @@ package com.community.groupbuy.controller;
 import com.community.groupbuy.common.JwtUtils;
 import com.community.groupbuy.config.JwtUser;
 import com.community.groupbuy.dto.LoginDTO;
+import com.community.groupbuy.common.BusinessException;
+import com.community.groupbuy.common.ResultCode;
 import com.community.groupbuy.entity.SysUser;
 import com.community.groupbuy.mapper.SysUserMapper;
 import jakarta.validation.Valid;
@@ -34,12 +36,12 @@ public class AuthController {
         // 1. 查数据库
         SysUser user = sysUserMapper.selectByUsername(loginDTO.getUsername());
         if (user == null) {
-            throw new RuntimeException("用户名或密码错误");
+            throw new BusinessException(ResultCode.PASSWORD_ERROR);
         }
 
         // 2. 校验密码 (matches 会自动比对明文和数据库里的密文)
         if (!passwordEncoder.matches(loginDTO.getPassword(), user.getPassword())) {
-            throw new RuntimeException("用户名或密码错误");
+            throw new BusinessException(ResultCode.PASSWORD_ERROR);
         }
 
         // 3. 生成 Token
@@ -68,7 +70,7 @@ public class AuthController {
         // 1. 检查用户名是否重复
         SysUser existUser = sysUserMapper.selectByUsername(user.getUsername());
         if (existUser != null) {
-            throw new RuntimeException("该用户名已被注册");
+            throw new BusinessException(ResultCode.USER_EXISTS);
         }
 
         // 2. 密码加密
