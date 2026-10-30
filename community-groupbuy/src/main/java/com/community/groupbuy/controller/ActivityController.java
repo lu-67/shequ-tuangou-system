@@ -57,6 +57,14 @@ public class ActivityController {
         return Result.success(activityService.listOngoing());
     }
 
+    /** 团长/管理员：查询我创建的活动（全部状态），用于前台「我的开团」页面 */
+    @GetMapping("/mine")
+    public Result<List<GroupActivity>> mine() {
+        Long userId = SecurityUtils.getUserId();
+        String role = SecurityUtils.getRole();
+        return Result.success(activityService.listMyActivities(userId, role));
+    }
+
     @GetMapping("/{id}")
     public Result<GroupActivity> get(@PathVariable Long id) {
         return Result.success(activityService.getActivity(id));

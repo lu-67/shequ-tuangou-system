@@ -72,11 +72,19 @@ const route = useRoute()
 const router = useRouter()
 const user = useUserStore()
 
-const navs = [
-  { path: '/home', label: '团购首页' },
-  { path: '/orders', label: '我的订单' },
-  { path: '/mine', label: '个人中心' }
-]
+const navs = computed(() => {
+  const base = [
+    { path: '/home', label: '团购首页' },
+    { path: '/orders', label: '我的订单' },
+    { path: '/mine', label: '个人中心' }
+  ]
+  // 团长 / 管理员 额外显示两个入口
+  if (isStaff.value) {
+    base.splice(1, 0, { path: '/my-activities', label: '我的开团' })
+    base.splice(2, 0, { path: '/create-activity', label: '发起开团' })
+  }
+  return base
+})
 
 const isStaff = computed(
   () => user.userInfo?.role === 'ADMIN' || user.userInfo?.role === 'HEAD'

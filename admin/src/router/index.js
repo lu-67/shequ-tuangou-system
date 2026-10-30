@@ -38,8 +38,8 @@ const router = createRouter({
 
 // ================= 全局路由守卫 =================
 router.beforeEach((to, from, next) => {
-  // 获取本地存储的 token
-  const token = localStorage.getItem('token')
+  // 获取本地存储的 token（与 user.js store 的 TOKEN_KEY='cg_token' 对齐）
+  const token = localStorage.getItem('cg_token')
 
   if (to.path !== '/login' && !token) {
     // 如果没登录，且去的不是登录页，强制跳到登录页

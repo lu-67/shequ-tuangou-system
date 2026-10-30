@@ -105,6 +105,7 @@ public class OrderService {
         order.setActivityId(activity.getId());
         order.setUserId(userId);
         order.setProductId(activity.getProductId());
+        order.setPickupPointId(dto.getPickupPointId());
         order.setQuantity(dto.getQuantity());
         order.setAmount(activity.getGroupPrice().multiply(BigDecimal.valueOf(dto.getQuantity())));
         order.setStatus(Constants.ORDER_UNPAID);

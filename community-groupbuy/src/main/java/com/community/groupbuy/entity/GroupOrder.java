@@ -16,6 +16,7 @@ public class GroupOrder {
     private Long activityId;
     private Long userId;
     private Long productId;
+    private Long pickupPointId;
     private Integer quantity;
     private BigDecimal amount;
     private String status;

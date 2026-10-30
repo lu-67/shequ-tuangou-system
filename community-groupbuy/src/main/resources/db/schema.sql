@@ -47,6 +47,7 @@ DROP TABLE IF EXISTS group_activity;
 CREATE TABLE group_activity (
     id           BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
     product_id   BIGINT       NOT NULL COMMENT '关联商品',
+    creator_id   BIGINT       DEFAULT NULL COMMENT '创建者(团长/管理员)用户ID',
     title        VARCHAR(120) NOT NULL COMMENT '活动标题',
     origin_price DECIMAL(10,2) NOT NULL COMMENT '原价',
     group_price  DECIMAL(10,2) NOT NULL COMMENT '团购价',
@@ -59,28 +60,31 @@ CREATE TABLE group_activity (
     create_time  DATETIME     DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
     KEY idx_status (status),
-    KEY idx_product (product_id)
+    KEY idx_product (product_id),
+    KEY idx_creator (creator_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='团购活动表';
 
 -- 4. 参团订单
 DROP TABLE IF EXISTS group_order;
 CREATE TABLE group_order (
-    id                BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
-    order_no          VARCHAR(40)  NOT NULL COMMENT '订单号',
-    activity_id       BIGINT       NOT NULL COMMENT '关联活动',
-    user_id           BIGINT       NOT NULL COMMENT '下单用户',
-    product_id        BIGINT       DEFAULT NULL COMMENT '商品',
-    quantity          INT          NOT NULL DEFAULT 1 COMMENT '数量',
-    amount            DECIMAL(10,2) NOT NULL COMMENT '实付金额',
-    status            VARCHAR(20)  NOT NULL DEFAULT 'UNPAID' COMMENT 'UNPAID/PAID/CANCELLED/PICKED',
-    verification_code VARCHAR(20)  DEFAULT NULL COMMENT '自提核销码',
-    create_time       DATETIME     DEFAULT CURRENT_TIMESTAMP COMMENT '下单时间',
-    pay_time          DATETIME     DEFAULT NULL COMMENT '支付时间',
+    id                  BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
+    order_no            VARCHAR(40)  NOT NULL COMMENT '订单号',
+    activity_id         BIGINT       NOT NULL COMMENT '关联活动',
+    user_id             BIGINT       NOT NULL COMMENT '下单用户',
+    product_id          BIGINT       DEFAULT NULL COMMENT '商品',
+    pickup_point_id     BIGINT       DEFAULT NULL COMMENT '自提点ID（下单时选择）',
+    quantity            INT          NOT NULL DEFAULT 1 COMMENT '数量',
+    amount              DECIMAL(10,2) NOT NULL COMMENT '实付金额',
+    status              VARCHAR(20)  NOT NULL DEFAULT 'UNPAID' COMMENT 'UNPAID/PAID/CANCELLED/PICKED',
+    verification_code   VARCHAR(20)  DEFAULT NULL COMMENT '自提核销码',
+    create_time         DATETIME     DEFAULT CURRENT_TIMESTAMP COMMENT '下单时间',
+    pay_time            DATETIME     DEFAULT NULL COMMENT '支付时间',
     PRIMARY KEY (id),
     UNIQUE KEY uk_order_no (order_no),
     UNIQUE KEY uk_verification_code (verification_code),
     KEY idx_activity (activity_id),
-    KEY idx_user (user_id)
+    KEY idx_user (user_id),
+    KEY idx_pickup_point (pickup_point_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='参团订单表';
 
 -- 5. 自提点

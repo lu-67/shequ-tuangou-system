@@ -30,6 +30,13 @@ public class StatsServiceImpl implements StatsService {
         return list == null ? new ArrayList<>() : list;
     }
 
+    private static final Map<String, String> STATUS_MAP = Map.of(
+            "UNPAID", "待支付",
+            "PAID", "已支付",
+            "CANCELLED", "已取消",
+            "PICKED", "已核销"
+    );
+
     @Override
     public void exportOrders(HttpServletResponse response) {
         try {
@@ -41,6 +48,7 @@ public class StatsServiceImpl implements StatsService {
             List<Map<String, Object>> orderList = statsMapper.getOrderListForExport(null);
             if (orderList == null) orderList = new ArrayList<>();
 
+            // 表头（与图片中 Excel 设计一致）
             List<List<String>> head = new ArrayList<>();
             head.add(List.of("订单号"));
             head.add(List.of("下单用户ID"));
@@ -48,10 +56,28 @@ public class StatsServiceImpl implements StatsService {
             head.add(List.of("订单状态"));
             head.add(List.of("下单时间"));
 
+            // 将 Map 列表转换为 EasyExcel 需要的二维数组格式
+            List<List<Object>> dataList = new ArrayList<>();
+            for (Map<String, Object> row : orderList) {
+                List<Object> rowData = new ArrayList<>();
+                // 1. 订单号
+                rowData.add(row.get("orderNo"));
+                // 2. 下单用户ID
+                rowData.add(row.get("username"));
+                // 3. 支付金额
+                rowData.add(row.get("amount"));
+                // 4. 订单状态：转换为中文
+                String status = (String) row.get("status");
+                rowData.add(STATUS_MAP.getOrDefault(status, status));
+                // 5. 下单时间
+                rowData.add(row.get("createTime"));
+                dataList.add(rowData);
+            }
+
             EasyExcel.write(response.getOutputStream())
                     .head(head)
                     .sheet("订单数据")
-                    .doWrite(orderList);
+                    .doWrite(dataList);
         } catch (IOException e) {
             throw new RuntimeException("导出Excel失败", e);
         }

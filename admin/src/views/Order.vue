@@ -56,7 +56,7 @@ function formatMoney(v) {
 async function load() {
   loading.value = true
   try {
-    const data = await request.get('/api/stats/orders')
+    const data = await request.get('/stats/orders')
     orders.value = Array.isArray(data) ? data : []
   } catch (e) {
     orders.value = []

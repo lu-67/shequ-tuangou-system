@@ -42,7 +42,7 @@ public class ActivityService {
     public Long createActivity(CreateActivityDTO dto, Long operatorId, String operatorRole) {
         assertHeadOrAdmin(operatorRole);
         validateCreateParam(dto);
-        GroupActivity activity = buildActivity(dto);
+        GroupActivity activity = buildActivity(dto, operatorId);
         activityMapper.insert(activity);
         // M7：初始状态若已是 ONGOING，立即预热库存（当前创建固定 PENDING，此处为保护性判断）
         if (Constants.ACTIVITY_ONGOING.equals(activity.getStatus())) {
@@ -93,6 +93,12 @@ public class ActivityService {
     /** 进行中活动列表（居民端首页） */
     public List<GroupActivity> listOngoing() {
         return activityMapper.selectOngoing();
+    }
+
+    /** 团长/管理员：我创建的活动（全部状态），用于前台「我的开团」页面 */
+    public List<GroupActivity> listMyActivities(Long userId, String role) {
+        assertHeadOrAdmin(role);
+        return activityMapper.selectByCreator(userId);
     }
 
     /**
@@ -168,8 +174,9 @@ public class ActivityService {
         }
     }
 
-    private GroupActivity buildActivity(CreateActivityDTO dto) {
+    private GroupActivity buildActivity(CreateActivityDTO dto, Long operatorId) {
         GroupActivity activity = new GroupActivity();
+        activity.setCreatorId(operatorId);
         activity.setProductId(dto.getProductId());
         activity.setTitle(dto.getTitle());
         activity.setOriginPrice(dto.getOriginPrice());

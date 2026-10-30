@@ -22,6 +22,7 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import request from '@/utils/request'
 import { ElMessage } from 'element-plus'
+import { useUserStore } from '@/stores/user'
 
 const router = useRouter()
 const loginForm = ref(null)
@@ -38,17 +39,13 @@ const handleLogin = async () => {
   }
   loading.value = true
   try {
-    const res = await request.post('/api/auth/login', form.value)
-    if (res.code === 200) {
-      localStorage.setItem('token', res.data.token)
-      localStorage.setItem('userInfo', JSON.stringify(res.data))
-      ElMessage.success('登录成功')
-      router.push('/')
-    } else {
-      ElMessage.error(res.message || '登录失败')
-    }
+    // 拦截器在 code===200 时已解包，res 即后端 data：{ token, role, username }
+    const data = await request.post('/auth/login', form.value)
+    useUserStore().setLogin(data)
+    ElMessage.success('登录成功')
+    router.push('/')
   } catch (e) {
-    ElMessage.error('网络请求失败')
+    // 拦截器已统一弹出后端错误信息，这里不再重复提示
   } finally {
     loading.value = false
   }

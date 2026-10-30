@@ -13,6 +13,7 @@ import java.time.LocalDateTime;
 public class GroupActivity {
     private Long id;
     private Long productId;
+    private Long creatorId;
     private String title;
     private BigDecimal originPrice;
     private BigDecimal groupPrice;

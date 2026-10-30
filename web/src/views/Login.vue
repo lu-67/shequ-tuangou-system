@@ -26,6 +26,7 @@ import { useRouter } from 'vue-router'
 // 注意：如果 web 端的 request 路径不同，请调整下面的导入路径
 import request from '@/utils/request'
 import { ElMessage } from 'element-plus'
+import { useUserStore } from '@/stores/user'
 
 const router = useRouter()
 const loading = ref(false)
@@ -41,18 +42,13 @@ const handleLogin = async () => {
   }
   loading.value = true
   try {
-    const res = await request.post('/api/auth/login', form.value)
-    if (res.code === 200) {
-      localStorage.setItem('token', res.data.token)
-      localStorage.setItem('userInfo', JSON.stringify(res.data))
-      ElMessage.success('登录成功')
-      // 登录成功后跳转到居民端首页（如果你的首页路由不是 '/' 请自行修改）
-      router.push('/')
-    } else {
-      ElMessage.error(res.message || '登录失败')
-    }
+    // 拦截器在 code===200 时已解包，res 即后端 data：{ token, role, username }
+    const data = await request.post('/auth/login', form.value)
+    useUserStore().setLogin(data)
+    ElMessage.success('登录成功')
+    router.push('/')
   } catch (e) {
-    ElMessage.error('网络请求失败，请检查后端服务')
+    // 拦截器已统一弹出后端错误信息，这里不再重复提示
   } finally {
     loading.value = false
   }

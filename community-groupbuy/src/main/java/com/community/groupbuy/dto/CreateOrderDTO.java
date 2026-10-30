@@ -14,4 +14,6 @@ public class CreateOrderDTO {
     @NotNull(message = "购买数量不能为空")
     @Min(value = 1, message = "购买数量至少为1")
     private Integer quantity;
+    @NotNull(message = "请选择自提点")
+    private Long pickupPointId;
 }

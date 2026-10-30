@@ -21,8 +21,8 @@ import java.util.List;
 @Mapper
 public interface OrderMapper {
 
-    @Insert("INSERT INTO group_order(order_no, activity_id, user_id, product_id, quantity, amount, status, verification_code, create_time) "
-            + "VALUES(#{orderNo}, #{activityId}, #{userId}, #{productId}, #{quantity}, #{amount}, #{status}, #{verificationCode}, NOW())")
+    @Insert("INSERT INTO group_order(order_no, activity_id, user_id, product_id, pickup_point_id, quantity, amount, status, verification_code, create_time) "
+            + "VALUES(#{orderNo}, #{activityId}, #{userId}, #{productId}, #{pickupPointId}, #{quantity}, #{amount}, #{status}, #{verificationCode}, NOW())")
     @Options(useGeneratedKeys = true, keyProperty = "id")
     int insert(GroupOrder order);
 

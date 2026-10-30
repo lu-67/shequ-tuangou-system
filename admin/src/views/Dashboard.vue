@@ -36,7 +36,7 @@ function formatMoney(v) {
 
 async function load() {
   try {
-    const data = await request.get('/api/stats/overview')
+    const data = await request.get('/stats/overview')
     overview.value = data || { totalOrders: 0, totalSales: 0 }
   } catch (e) {
     overview.value = { totalOrders: 0, totalSales: 0 }

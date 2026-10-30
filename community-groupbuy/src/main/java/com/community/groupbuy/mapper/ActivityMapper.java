@@ -36,8 +36,8 @@ public interface ActivityMapper {
     int incrementStock(@Param("activityId") Long activityId, @Param("qty") Integer qty);
 
     /** M2：创建开团活动，主键回填到 id */
-    @Insert("INSERT INTO group_activity(product_id, title, origin_price, group_price, total_stock, stock, per_limit, status, start_time, end_time) "
-            + "VALUES(#{productId}, #{title}, #{originPrice}, #{groupPrice}, #{totalStock}, #{stock}, #{perLimit}, #{status}, #{startTime}, #{endTime})")
+    @Insert("INSERT INTO group_activity(product_id, creator_id, title, origin_price, group_price, total_stock, stock, per_limit, status, start_time, end_time) "
+            + "VALUES(#{productId}, #{creatorId}, #{title}, #{originPrice}, #{groupPrice}, #{totalStock}, #{stock}, #{perLimit}, #{status}, #{startTime}, #{endTime})")
     @Options(useGeneratedKeys = true, keyProperty = "id")
     int insert(GroupActivity activity);
 
@@ -56,6 +56,10 @@ public interface ActivityMapper {
 
     /** M2：进行中的活动列表（首页用），按结束时间正序（快结束的排前面） */
     List<GroupActivity> selectOngoing();
+
+    /** 团长/管理员：查询我创建的活动（全部状态），按创建时间倒序 */
+    @Select("SELECT * FROM group_activity WHERE creator_id = #{creatorId} ORDER BY id DESC")
+    List<GroupActivity> selectByCreator(@Param("creatorId") Long creatorId);
 
     /** M8：已到期但仍处于 ONGOING 的活动，供定时任务判定成团/失败 */
     List<GroupActivity> selectExpired(@Param("now") LocalDateTime now);

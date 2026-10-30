@@ -57,6 +57,11 @@ INSERT INTO group_activity (id, product_id, title, origin_price, group_price, to
 INSERT INTO group_activity (id, product_id, title, origin_price, group_price, total_stock, stock, per_limit, status, start_time, end_time, create_time) VALUES (14, 14, '酸奶社区拼团', 29.9, 21.9, 220, 145, 5, 'ONGOING', '2026-10-01 00:00:00', '2026-10-31 23:59:59', '2026-09-10 08:00:00');
 INSERT INTO group_activity (id, product_id, title, origin_price, group_price, total_stock, stock, per_limit, status, start_time, end_time, create_time) VALUES (15, 15, '牛肉卷社区拼团', 55.9, 42.9, 130, 85, 5, 'PENDING', '2026-10-01 00:00:00', '2026-10-31 23:59:59', '2026-09-10 08:00:00');
 
+-- 给 demo 活动补 creator_id（活动1-5 admin开, 6-10 head1开, 11-15 head2开）
+UPDATE group_activity SET creator_id = 1 WHERE id BETWEEN 1 AND 5;
+UPDATE group_activity SET creator_id = 2 WHERE id BETWEEN 6 AND 10;
+UPDATE group_activity SET creator_id = 3 WHERE id BETWEEN 11 AND 15;
+
 -- 自提点表
 INSERT INTO pickup_point (id, name, address, manager, phone, create_time) VALUES (1, '阳光花园自提点', '高新区阳光花园小区东门', '王姐', '13800000002', '2026-09-08 10:00:00');
 INSERT INTO pickup_point (id, name, address, manager, phone, create_time) VALUES (2, '滨江苑自提点', '锦江区滨江苑3栋架空层', '李哥', '13800000003', '2026-09-08 10:00:00');
