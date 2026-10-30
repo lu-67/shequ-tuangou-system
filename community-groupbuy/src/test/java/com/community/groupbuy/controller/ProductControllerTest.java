@@ -59,7 +59,8 @@ class ProductControllerTest {
     /** 分页查询：返回 { total, list } 对象，不是数组 */
     @Test
     void page_returnsPageObject() throws Exception {
-        mockMvc.perform(get("/api/products").param("pageNum", "1").param("pageSize", "5"))
+        mockMvc.perform(get("/api/products").param("pageNum", "1").param("pageSize", "5")
+                        .with(user(adminUser())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code", is(200)))
                 .andExpect(jsonPath("$.data.total").exists())
@@ -104,7 +105,8 @@ class ProductControllerTest {
     /** 商品不存在：详情返回业务码 1101 */
     @Test
     void get_notFound_returns1101() throws Exception {
-        mockMvc.perform(get("/api/products/999999"))
+        mockMvc.perform(get("/api/products/999999")
+                        .with(user(adminUser())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code", is(1101)));
     }
