@@ -3,9 +3,11 @@ import { ElMessage } from 'element-plus'
 import router from '../router'
 import { useUserStore } from '../stores/user'
 
-// 统一请求封装：相对路径 /api 由 Vite 代理转发到后端 8080
+// 统一请求封装：
+// - 开发环境(.env.development 的 VITE_API_BASE)直连后端 8080，绕过本地代理对 /api 的干扰；
+// - 生产环境未配置 VITE_API_BASE 时回退为相对路径 /api，由 Nginx 同源转发。
 const request = axios.create({
-  baseURL: '/api',
+  baseURL: import.meta.env.VITE_API_BASE || '/api',
   timeout: 10000
 })
 
