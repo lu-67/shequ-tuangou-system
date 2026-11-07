@@ -27,7 +27,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * - @Transactional：每个测试的数据库变更自动回滚；
  * - 登录上下文用 SecurityMockMvcRequestPostProcessors.user(JwtUser) 构造
  *   （JwtUser 实现了 UserDetails，可直接作为认证主体，与线上 JWT 过滤器放入的主体一致）；
- * - M0（D 同学）实现后，可改用登录接口拿 token + Authorization 头，并补「鉴权失败/越权」用例。
+ * - 鉴权失败用例已补（无 token 访问 -> 403）；越权场景由 M6 StatsController 覆盖（ADMIN-only 接口）。
  */
 @SpringBootTest(properties = "spring.sql.init.mode=never")
 @AutoConfigureMockMvc
@@ -48,7 +48,7 @@ class OrderControllerTest {
         mockMvc.perform(post("/api/orders")
                         .with(user(residentUser()))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"activityId\":1,\"quantity\":1}"))
+                        .content("{\"activityId\":1,\"quantity\":1,\"pickupPointId\":1}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code", is(200)))
                 .andExpect(jsonPath("$.data").isNumber());
@@ -60,7 +60,7 @@ class OrderControllerTest {
         mockMvc.perform(post("/api/orders")
                         .with(user(residentUser()))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"activityId\":1,\"quantity\":0}"))
+                        .content("{\"activityId\":1,\"quantity\":0,\"pickupPointId\":1}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code", is(400)));
     }
@@ -71,7 +71,7 @@ class OrderControllerTest {
         mockMvc.perform(post("/api/orders")
                         .with(user(residentUser()))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"activityId\":1,\"quantity\":9999}"))
+                        .content("{\"activityId\":1,\"quantity\":9999,\"pickupPointId\":1}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code", is(400)))
                 .andExpect(jsonPath("$.message", is("超过每人限购数量")));
@@ -84,5 +84,17 @@ class OrderControllerTest {
                         .with(user(residentUser())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code", is(3001)));
+    }
+
+    /**
+     * 鉴权失败：未携带任何认证信息访问下单接口，全局规则要求 /api/** 必须认证，
+     * 项目统一返回 403（未配 AuthenticationEntryPoint，不返回 401）。
+     */
+    @Test
+    void createOrder_noToken_forbidden() throws Exception {
+        mockMvc.perform(post("/api/orders")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"activityId\":1,\"quantity\":1}"))
+                .andExpect(status().isForbidden());
     }
 }
