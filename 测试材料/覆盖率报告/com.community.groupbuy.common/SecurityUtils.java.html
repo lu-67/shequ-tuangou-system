@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SecurityUtils.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">community-groupbuy</a> &gt; <a href="index.source.html" class="el_package">com.community.groupbuy.common</a> &gt; <span class="el_source">SecurityUtils.java</span></div><h1>SecurityUtils.java</h1><pre class="source lang-java linenums">package com.community.groupbuy.common;
+
+import com.community.groupbuy.config.JwtUser;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+
+/**
+ * 获取当前登录用户上下文
+ */
+public final class SecurityUtils {
+
+    private SecurityUtils() {
+    }
+
+    public static JwtUser currentUser() {
+<span class="fc" id="L16">        Authentication auth = SecurityContextHolder.getContext().getAuthentication();</span>
+<span class="pc bpc" id="L17" title="2 of 4 branches missed.">        if (auth == null || !(auth.getPrincipal() instanceof JwtUser user)) {</span>
+<span class="nc" id="L18">            throw new BusinessException(ResultCode.UNAUTHORIZED);</span>
+        }
+<span class="fc" id="L20">        return user;</span>
+    }
+
+    public static Long getUserId() {
+<span class="fc" id="L24">        return currentUser().getId();</span>
+    }
+
+    public static String getUsername() {
+<span class="nc" id="L28">        return currentUser().getUsername();</span>
+    }
+
+    public static String getRole() {
+<span class="fc" id="L32">        return currentUser().getRole();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

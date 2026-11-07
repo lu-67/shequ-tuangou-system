@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ProductQueryDTO.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">community-groupbuy</a> &gt; <a href="index.source.html" class="el_package">com.community.groupbuy.dto</a> &gt; <span class="el_source">ProductQueryDTO.java</span></div><h1>ProductQueryDTO.java</h1><pre class="source lang-java linenums">package com.community.groupbuy.dto;
+
+import lombok.Data;
+
+import java.math.BigDecimal;
+
+/**
+ * 商品查询条件（M1，手写动态 SQL + 分页）
+ */
+<span class="pc bnc" id="L10" title="All 62 branches missed.">@Data</span>
+public class ProductQueryDTO {
+
+    /** 商品名称模糊匹配 */
+<span class="fc" id="L14">    private String name;</span>
+
+    /** 分类精确匹配 */
+<span class="fc" id="L17">    private String category;</span>
+
+    /** 1 上架 / 0 下架，null 表示不限 */
+<span class="fc" id="L20">    private Integer status;</span>
+
+    /** 团购价下限 */
+<span class="fc" id="L23">    private BigDecimal minPrice;</span>
+
+    /** 团购价上限 */
+<span class="fc" id="L26">    private BigDecimal maxPrice;</span>
+
+<span class="fc" id="L28">    private Integer pageNum = 1;</span>
+
+<span class="fc" id="L30">    private Integer pageSize = 10;</span>
+
+    /** 分页偏移量，供 Mapper XML 的 LIMIT 使用 */
+    public int getOffset() {
+<span class="fc" id="L34">        return (getSafePageNum() - 1) * getSafePageSize();</span>
+    }
+
+    /** 每页条数，最大 100，防止大翻页拖垮数据库 */
+    public int getSize() {
+<span class="fc" id="L39">        return getSafePageSize();</span>
+    }
+
+    private int getSafePageNum() {
+<span class="pc bpc" id="L43" title="2 of 4 branches missed.">        return pageNum == null || pageNum &lt; 1 ? 1 : pageNum;</span>
+    }
+
+    private int getSafePageSize() {
+<span class="pc bpc" id="L47" title="2 of 4 branches missed.">        if (pageSize == null || pageSize &lt; 1) {</span>
+<span class="nc" id="L48">            return 10;</span>
+        }
+<span class="fc" id="L50">        return Math.min(pageSize, 100);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

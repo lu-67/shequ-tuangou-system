@@ -1,0 +1,167 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ProductService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">community-groupbuy</a> &gt; <a href="index.source.html" class="el_package">com.community.groupbuy.service</a> &gt; <span class="el_source">ProductService.java</span></div><h1>ProductService.java</h1><pre class="source lang-java linenums">package com.community.groupbuy.service;
+
+import com.community.groupbuy.common.BusinessException;
+import com.community.groupbuy.common.Constants;
+import com.community.groupbuy.common.ResultCode;
+import com.community.groupbuy.dto.PageResult;
+import com.community.groupbuy.dto.ProductDTO;
+import com.community.groupbuy.dto.ProductQueryDTO;
+import com.community.groupbuy.entity.Product;
+import com.community.groupbuy.mapper.ProductMapper;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+import java.util.List;
+
+/**
+ * M1 商品管理：CRUD + 动态条件分页 + 上架商品列表
+ *
+ * 约定：
+ * - 写操作仅 ADMIN / HEAD，权限在 Service 内断言（与 ActivityService 一致，不依赖 M0 落地）；
+ * - 被团购活动引用的商品禁止物理删除，避免活动详情出现空商品；
+ * - 商品删除/更新走单表事务，跨表校验只读 group_activity，不改活动模块任何代码。
+ */
+<span class="fc" id="L27">@Slf4j</span>
+@Service
+<span class="fc" id="L29">@RequiredArgsConstructor</span>
+public class ProductService {
+
+    private static final int STATUS_ON_SHELF = 1;
+    private static final int STATUS_OFF_SHELF = 0;
+
+    private final ProductMapper productMapper;
+
+    /** M7：商品详情 Cache-Aside（C 同学） */
+    private final CacheService cacheService;
+
+    /** 新增商品，默认上架 */
+    @Transactional(rollbackFor = Exception.class)
+    public Long create(ProductDTO dto, String operatorRole) {
+<span class="fc" id="L43">        assertAdminOrHead(operatorRole);</span>
+<span class="fc" id="L44">        validate(dto);</span>
+<span class="fc" id="L45">        Product product = buildProduct(dto);</span>
+<span class="fc" id="L46">        productMapper.insert(product);</span>
+<span class="fc" id="L47">        log.info(&quot;商品创建成功: id={}, name={}, operator={}&quot;, product.getId(), product.getName(), operatorRole);</span>
+<span class="fc" id="L48">        return product.getId();</span>
+    }
+
+    /** 修改商品（全字段覆盖，create_time 不变） */
+    @Transactional(rollbackFor = Exception.class)
+    public void update(Long id, ProductDTO dto, String operatorRole) {
+<span class="fc" id="L54">        assertAdminOrHead(operatorRole);</span>
+<span class="fc" id="L55">        validate(dto);</span>
+<span class="fc" id="L56">        requireProduct(id);</span>
+<span class="fc" id="L57">        Product product = buildProduct(dto);</span>
+<span class="fc" id="L58">        product.setId(id);</span>
+<span class="fc" id="L59">        int rows = productMapper.update(product);</span>
+<span class="fc bfc" id="L60" title="All 2 branches covered.">        if (rows != 1) {</span>
+<span class="fc" id="L61">            throw new BusinessException(ResultCode.PRODUCT_NOT_FOUND, &quot;商品已被删除，更新失败&quot;);</span>
+        }
+<span class="fc" id="L63">        log.info(&quot;商品更新成功: id={}, name={}, operator={}&quot;, id, product.getName(), operatorRole);</span>
+<span class="fc" id="L64">    }</span>
+
+    /** 上架 / 下架 */
+    @Transactional(rollbackFor = Exception.class)
+    public void updateStatus(Long id, Integer status, String operatorRole) {
+<span class="fc" id="L69">        assertAdminOrHead(operatorRole);</span>
+<span class="pc bpc" id="L70" title="2 of 6 branches missed.">        if (status == null || (status != STATUS_ON_SHELF &amp;&amp; status != STATUS_OFF_SHELF)) {</span>
+<span class="fc" id="L71">            throw new BusinessException(ResultCode.PRODUCT_STATUS_ERROR, &quot;商品状态只能为 1（上架）或 0（下架）&quot;);</span>
+        }
+<span class="fc" id="L73">        requireProduct(id);</span>
+<span class="fc" id="L74">        int rows = productMapper.updateStatus(id, status);</span>
+<span class="pc bpc" id="L75" title="1 of 2 branches missed.">        if (rows != 1) {</span>
+<span class="nc" id="L76">            throw new BusinessException(ResultCode.PRODUCT_NOT_FOUND, &quot;商品已被删除，操作失败&quot;);</span>
+        }
+<span class="fc" id="L78">        log.info(&quot;商品上下架: id={}, status={}, operator={}&quot;, id, status, operatorRole);</span>
+<span class="fc" id="L79">    }</span>
+
+    /** 删除商品：被活动引用时拒绝 */
+    @Transactional(rollbackFor = Exception.class)
+    public void delete(Long id, String operatorRole) {
+<span class="fc" id="L84">        assertAdminOrHead(operatorRole);</span>
+<span class="fc" id="L85">        requireProduct(id);</span>
+<span class="fc" id="L86">        long refs = productMapper.countActivityRef(id);</span>
+<span class="fc bfc" id="L87" title="All 2 branches covered.">        if (refs &gt; 0) {</span>
+<span class="fc" id="L88">            throw new BusinessException(ResultCode.PRODUCT_REFERENCED,</span>
+                    &quot;该商品已被 &quot; + refs + &quot; 个团购活动引用，请改为下架&quot;);
+        }
+<span class="fc" id="L91">        productMapper.deleteById(id);</span>
+<span class="fc" id="L92">        log.info(&quot;商品删除成功: id={}, operator={}&quot;, id, operatorRole);</span>
+<span class="fc" id="L93">    }</span>
+
+    /**
+     * 商品详情（M7 缓存）：Cache-Aside + 分布式锁回源 + 随机 TTL
+     * 热点 key 过期瞬间并发请求，只有抢到锁的线程查库，其余读缓存。
+     */
+    public Product getById(Long id) {
+<span class="nc" id="L100">        return cacheService.getOrLoad(Constants.REDIS_CACHE_PRODUCT_PREFIX + id, Product.class,</span>
+<span class="nc" id="L101">                Constants.CACHE_PRODUCT_TTL_SECONDS, () -&gt; requireProduct(id));</span>
+    }
+
+    /** 动态条件分页查询（管理后台） */
+    public PageResult&lt;Product&gt; page(ProductQueryDTO query) {
+<span class="fc" id="L106">        long total = productMapper.countByCondition(query);</span>
+<span class="fc bfc" id="L107" title="All 2 branches covered.">        List&lt;Product&gt; list = total == 0 ? List.of() : productMapper.selectByCondition(query);</span>
+<span class="fc" id="L108">        return PageResult.of(total,</span>
+<span class="pc bpc" id="L109" title="1 of 2 branches missed.">                query.getPageNum() == null ? 1 : query.getPageNum(),</span>
+<span class="pc bpc" id="L110" title="1 of 2 branches missed.">                query.getPageSize() == null ? 10 : query.getPageSize(),</span>
+                list);
+    }
+
+    /** 上架商品（居民端首页 / 开团弹窗下拉） */
+    public List&lt;Product&gt; listOnShelf() {
+<span class="fc" id="L116">        return productMapper.selectOnShelf();</span>
+    }
+
+    private Product requireProduct(Long id) {
+<span class="fc" id="L120">        Product product = productMapper.selectById(id);</span>
+<span class="fc bfc" id="L121" title="All 2 branches covered.">        if (product == null) {</span>
+<span class="fc" id="L122">            throw new BusinessException(ResultCode.PRODUCT_NOT_FOUND);</span>
+        }
+<span class="fc" id="L124">        return product;</span>
+    }
+
+    private void assertAdminOrHead(String role) {
+<span class="fc bfc" id="L128" title="All 4 branches covered.">        if (!Constants.ROLE_ADMIN.equals(role) &amp;&amp; !Constants.ROLE_HEAD.equals(role)) {</span>
+<span class="fc" id="L129">            throw new BusinessException(ResultCode.FORBIDDEN, &quot;仅管理员或团长可管理商品&quot;);</span>
+        }
+<span class="fc" id="L131">    }</span>
+
+    /** 跨字段校验：团购价不得高于原价 */
+    private void validate(ProductDTO dto) {
+<span class="pc bpc" id="L135" title="1 of 4 branches missed.">        if (dto.getName() == null || dto.getName().trim().isEmpty()) {</span>
+<span class="fc" id="L136">            throw new BusinessException(ResultCode.PARAM_ERROR, &quot;商品名称不能为空&quot;);</span>
+        }
+<span class="pc bpc" id="L138" title="2 of 4 branches missed.">        if (dto.getPrice() == null || dto.getGroupPrice() == null) {</span>
+<span class="nc" id="L139">            throw new BusinessException(ResultCode.PARAM_ERROR, &quot;原价与团购价不能为空&quot;);</span>
+        }
+<span class="pc bpc" id="L141" title="1 of 2 branches missed.">        if (dto.getGroupPrice().compareTo(BigDecimal.ZERO) &lt; 0) {</span>
+<span class="nc" id="L142">            throw new BusinessException(ResultCode.PARAM_ERROR, &quot;团购价不能为负数&quot;);</span>
+        }
+<span class="fc bfc" id="L144" title="All 2 branches covered.">        if (dto.getGroupPrice().compareTo(dto.getPrice()) &gt; 0) {</span>
+<span class="fc" id="L145">            throw new BusinessException(ResultCode.PRODUCT_PRICE_ERROR);</span>
+        }
+<span class="pc bpc" id="L147" title="2 of 4 branches missed.">        if (dto.getStock() == null || dto.getStock() &lt; 0) {</span>
+<span class="nc" id="L148">            throw new BusinessException(ResultCode.PARAM_ERROR, &quot;库存不能为负数&quot;);</span>
+        }
+<span class="fc" id="L150">    }</span>
+
+    private Product buildProduct(ProductDTO dto) {
+<span class="fc" id="L153">        Product product = new Product();</span>
+<span class="fc" id="L154">        product.setName(dto.getName().trim());</span>
+<span class="pc bpc" id="L155" title="1 of 2 branches missed.">        product.setCategory(dto.getCategory() == null ? &quot;&quot; : dto.getCategory());</span>
+<span class="pc bpc" id="L156" title="1 of 2 branches missed.">        product.setSpec(dto.getSpec() == null ? &quot;&quot; : dto.getSpec());</span>
+<span class="pc bpc" id="L157" title="1 of 4 branches missed.">        product.setUnit(dto.getUnit() == null || dto.getUnit().isEmpty() ? &quot;份&quot; : dto.getUnit());</span>
+<span class="fc" id="L158">        product.setPrice(dto.getPrice());</span>
+<span class="fc" id="L159">        product.setGroupPrice(dto.getGroupPrice());</span>
+<span class="fc" id="L160">        product.setStock(dto.getStock());</span>
+<span class="fc bfc" id="L161" title="All 2 branches covered.">        product.setImageUrl(dto.getImageUrl() == null ? &quot;&quot; : dto.getImageUrl());</span>
+<span class="fc bfc" id="L162" title="All 2 branches covered.">        product.setDescription(dto.getDescription() == null ? &quot;&quot; : dto.getDescription());</span>
+<span class="fc bfc" id="L163" title="All 2 branches covered.">        product.setStatus(dto.getStatus() == null ? STATUS_ON_SHELF : dto.getStatus());</span>
+<span class="fc" id="L164">        return product;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

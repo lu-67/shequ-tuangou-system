@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RateLimitService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">community-groupbuy</a> &gt; <a href="index.source.html" class="el_package">com.community.groupbuy.service</a> &gt; <span class="el_source">RateLimitService.java</span></div><h1>RateLimitService.java</h1><pre class="source lang-java linenums">package com.community.groupbuy.service;
+
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+
+/**
+ * M7 限流：基于 Lua 令牌桶的分布式限流。
+ * Redis 不可用时自动放行（fail-open）。
+ */
+<span class="fc" id="L14">@Slf4j</span>
+@Service
+public class RateLimitService {
+
+    private final StringRedisTemplate stringRedisTemplate;
+
+    /** Lua 令牌桶脚本：原子地补充令牌并扣减，返回 1=放行 0=限流 */
+    private static final String TOKEN_BUCKET_LUA =
+            &quot;local key = KEYS[1] &quot;
+            + &quot;local capacity = tonumber(ARGV[1]) &quot;
+            + &quot;local refill = tonumber(ARGV[2]) &quot;
+            + &quot;local period = tonumber(ARGV[3]) &quot;
+            + &quot;local now = tonumber(ARGV[4]) &quot;
+            + &quot;local data = redis.call('HMGET', key, 'tokens', 'ts') &quot;
+            + &quot;local tokens = tonumber(data[1]) &quot;
+            + &quot;local ts = tonumber(data[2]) &quot;
+            + &quot;if tokens == nil then tokens = capacity; ts = now end &quot;
+            + &quot;local delta = math.floor((now - ts) / period) * refill &quot;
+            + &quot;tokens = math.min(capacity, tokens + delta) &quot;
+            + &quot;local allowed = 0 &quot;
+            + &quot;if tokens &gt;= 1 then tokens = tokens - 1; allowed = 1 end &quot;
+            + &quot;redis.call('HMSET', key, 'tokens', tokens, 'ts', now) &quot;
+            + &quot;redis.call('EXPIRE', key, period * 2 + 10) &quot;
+            + &quot;return allowed &quot;;
+
+<span class="fc" id="L39">    private final DefaultRedisScript&lt;Long&gt; tokenBucketScript =</span>
+            new DefaultRedisScript&lt;&gt;(TOKEN_BUCKET_LUA, Long.class);
+
+<span class="fc" id="L42">    public RateLimitService(StringRedisTemplate stringRedisTemplate) {</span>
+<span class="fc" id="L43">        this.stringRedisTemplate = stringRedisTemplate;</span>
+<span class="fc" id="L44">    }</span>
+
+    /**
+     * 尝试获取令牌
+     * @param key        限流键
+     * @param capacity   桶容量
+     * @param refill     每个周期补充的令牌数
+     * @param periodSec  补充周期（秒）
+     * @return true=放行
+     */
+    public boolean tryAcquire(String key, int capacity, int refill, int periodSec) {
+        try {
+<span class="fc" id="L56">            long nowSec = System.currentTimeMillis() / 1000L;</span>
+<span class="pc" id="L57">            Long result = stringRedisTemplate.execute(tokenBucketScript,</span>
+<span class="fc" id="L58">                    List.of(key),</span>
+<span class="fc" id="L59">                    String.valueOf(capacity),</span>
+<span class="fc" id="L60">                    String.valueOf(refill),</span>
+<span class="fc" id="L61">                    String.valueOf(periodSec),</span>
+<span class="fc" id="L62">                    String.valueOf(nowSec));</span>
+<span class="nc" id="L63">            return Long.valueOf(1L).equals(result);</span>
+<span class="fc" id="L64">        } catch (Exception e) {</span>
+<span class="fc" id="L65">            log.warn(&quot;限流脚本执行失败，自动放行 key={}: {}&quot;, key, e.getMessage());</span>
+<span class="fc" id="L66">            return true;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

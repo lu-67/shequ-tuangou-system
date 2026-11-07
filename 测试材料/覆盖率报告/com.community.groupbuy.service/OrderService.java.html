@@ -1,0 +1,155 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>OrderService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">community-groupbuy</a> &gt; <a href="index.source.html" class="el_package">com.community.groupbuy.service</a> &gt; <span class="el_source">OrderService.java</span></div><h1>OrderService.java</h1><pre class="source lang-java linenums">package com.community.groupbuy.service;
+
+import com.community.groupbuy.common.BusinessException;
+import com.community.groupbuy.common.Constants;
+import com.community.groupbuy.common.ResultCode;
+import com.community.groupbuy.dto.CreateOrderDTO;
+import com.community.groupbuy.dto.OrderQueryDTO;
+import com.community.groupbuy.entity.GroupActivity;
+import com.community.groupbuy.entity.GroupOrder;
+import com.community.groupbuy.mapper.ActivityMapper;
+import com.community.groupbuy.mapper.OrderMapper;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.concurrent.ThreadLocalRandom;
+
+/**
+ * M3 参团下单（核心并发）：Redis 预扣 + DB CAS + Lua 限流，跨表写事务
+ */
+<span class="fc" id="L28">@Slf4j</span>
+@Service
+<span class="fc" id="L30">@RequiredArgsConstructor</span>
+public class OrderService {
+
+    private final ActivityMapper activityMapper;
+    private final OrderMapper orderMapper;
+    private final RateLimitService rateLimitService;
+    private final StringRedisTemplate stringRedisTemplate;
+
+    @Value(&quot;${app.rate-limit.capacity:200}&quot;)
+    private int rateCapacity;
+    @Value(&quot;${app.rate-limit.refill-tokens:50}&quot;)
+    private int rateRefill;
+    @Value(&quot;${app.rate-limit.refill-seconds:1}&quot;)
+    private int ratePeriod;
+
+    /**
+     * 参团下单：限流 -&gt; 活动校验 -&gt; Redis 预扣(可选) -&gt; DB CAS 扣库存 -&gt; 落订单。
+     * 整个库存扣减与订单写入在同一事务内，保证不超卖。
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public Long createOrder(Long userId, CreateOrderDTO dto) {
+        // 1. 令牌桶限流（Lua）
+<span class="fc" id="L52">        String rateKey = Constants.REDIS_RATE_LIMIT_PREFIX + &quot;create&quot;;</span>
+<span class="fc bfc" id="L53" title="All 2 branches covered.">        if (!rateLimitService.tryAcquire(rateKey, rateCapacity, rateRefill, ratePeriod)) {</span>
+<span class="fc" id="L54">            throw new BusinessException(ResultCode.RATE_LIMIT);</span>
+        }
+
+        // 2. 活动校验
+<span class="fc" id="L58">        GroupActivity activity = activityMapper.selectById(dto.getActivityId());</span>
+<span class="fc bfc" id="L59" title="All 2 branches covered.">        if (activity == null) {</span>
+<span class="fc" id="L60">            throw new BusinessException(ResultCode.ACTIVITY_NOT_FOUND);</span>
+        }
+<span class="fc bfc" id="L62" title="All 2 branches covered.">        if (!Constants.ACTIVITY_ONGOING.equals(activity.getStatus())) {</span>
+<span class="fc" id="L63">            throw new BusinessException(ResultCode.ACTIVITY_NOT_ONGOING);</span>
+        }
+<span class="pc bpc" id="L65" title="2 of 4 branches missed.">        if (dto.getQuantity() == null || dto.getQuantity() &lt; 1) {</span>
+<span class="nc" id="L66">            throw new BusinessException(ResultCode.PARAM_ERROR, &quot;购买数量不合法&quot;);</span>
+        }
+<span class="fc bfc" id="L68" title="All 2 branches covered.">        if (dto.getQuantity() &gt; activity.getPerLimit()) {</span>
+<span class="fc" id="L69">            throw new BusinessException(ResultCode.PARAM_ERROR, &quot;超过每人限购数量&quot;);</span>
+        }
+
+        // 3. Redis 预扣（Cache-Aside：仅当库存已预热时生效；Redis 不可用时自动降级，直接走 DB CAS）
+<span class="fc" id="L73">        String stockKey = Constants.REDIS_STOCK_PREFIX + activity.getId();</span>
+<span class="fc" id="L74">        boolean redisPre = false;</span>
+        try {
+<span class="pc bpc" id="L76" title="1 of 2 branches missed.">            if (Boolean.TRUE.equals(stringRedisTemplate.hasKey(stockKey))) {</span>
+<span class="nc" id="L77">                Long after = stringRedisTemplate.opsForValue().increment(stockKey, -dto.getQuantity());</span>
+<span class="nc bnc" id="L78" title="All 4 branches missed.">                if (after == null || after &lt; 0) {</span>
+<span class="nc bnc" id="L79" title="All 2 branches missed.">                    if (after != null) {</span>
+<span class="nc" id="L80">                        stringRedisTemplate.opsForValue().increment(stockKey, dto.getQuantity());</span>
+                    }
+<span class="nc" id="L82">                    throw new BusinessException(ResultCode.STOCK_NOT_ENOUGH);</span>
+                }
+<span class="nc" id="L84">                redisPre = true;</span>
+            }
+<span class="nc" id="L86">        } catch (BusinessException e) {</span>
+<span class="nc" id="L87">            throw e;</span>
+<span class="fc" id="L88">        } catch (Exception e) {</span>
+            // Redis 不可用：降级为纯 DB 扣减，核心流程不受影响
+<span class="fc" id="L90">            log.warn(&quot;Redis 预扣不可用，降级为 DB 扣减: {}&quot;, e.getMessage());</span>
+<span class="fc" id="L91">        }</span>
+
+        // 4. DB CAS 扣库存（权威，保证不超卖）
+<span class="fc" id="L94">        int rows = activityMapper.deductStockCAS(activity.getId(), dto.getQuantity());</span>
+<span class="fc bfc" id="L95" title="All 2 branches covered.">        if (rows != 1) {</span>
+<span class="pc bpc" id="L96" title="1 of 2 branches missed.">            if (redisPre) {</span>
+<span class="nc" id="L97">                restoreRedisStock(stockKey, dto.getQuantity());</span>
+            }
+<span class="fc" id="L99">            throw new BusinessException(ResultCode.STOCK_NOT_ENOUGH);</span>
+        }
+
+        // 5. 落订单（UNPAID，待支付），并生成唯一核销码
+<span class="fc" id="L103">        GroupOrder order = new GroupOrder();</span>
+<span class="fc" id="L104">        order.setOrderNo(generateOrderNo());</span>
+<span class="fc" id="L105">        order.setActivityId(activity.getId());</span>
+<span class="fc" id="L106">        order.setUserId(userId);</span>
+<span class="fc" id="L107">        order.setProductId(activity.getProductId());</span>
+<span class="fc" id="L108">        order.setPickupPointId(dto.getPickupPointId());</span>
+<span class="fc" id="L109">        order.setQuantity(dto.getQuantity());</span>
+<span class="fc" id="L110">        order.setAmount(activity.getGroupPrice().multiply(BigDecimal.valueOf(dto.getQuantity())));</span>
+<span class="fc" id="L111">        order.setStatus(Constants.ORDER_UNPAID);</span>
+<span class="fc" id="L112">        orderMapper.insert(order);</span>
+<span class="fc" id="L113">        orderMapper.updateVerificationCode(order.getId(), &quot;CG&quot; + String.format(&quot;%08d&quot;, order.getId()));</span>
+
+<span class="fc" id="L115">        log.info(&quot;下单成功: orderId={}, activityId={}, qty={}, redisPre={}&quot;, order.getId(), activity.getId(), dto.getQuantity(), redisPre);</span>
+<span class="fc" id="L116">        return order.getId();</span>
+    }
+
+    public GroupOrder getOrder(Long id) {
+<span class="fc" id="L120">        GroupOrder order = orderMapper.selectById(id);</span>
+<span class="pc bpc" id="L121" title="1 of 2 branches missed.">        if (order == null) {</span>
+<span class="fc" id="L122">            throw new BusinessException(ResultCode.ORDER_NOT_FOUND);</span>
+        }
+<span class="nc" id="L124">        return order;</span>
+    }
+
+    /**
+     * 我的订单（居民端）：按当前登录用户查询，倒序返回
+     * 复用 selectByCondition 动态 SQL，仅限定 userId
+     */
+    public List&lt;GroupOrder&gt; listMyOrders(Long userId) {
+<span class="fc" id="L132">        OrderQueryDTO query = new OrderQueryDTO();</span>
+<span class="fc" id="L133">        query.setUserId(userId);</span>
+        // 防御性拷贝：Mapper 返回的 List 可能不可变（如测试中的 List.of），拷贝后再排序
+<span class="fc" id="L135">        List&lt;GroupOrder&gt; sorted = new ArrayList&lt;&gt;(orderMapper.selectByCondition(query));</span>
+<span class="fc" id="L136">        sorted.sort(Comparator.comparing(GroupOrder::getId).reversed());</span>
+<span class="fc" id="L137">        return sorted;</span>
+    }
+
+    private String generateOrderNo() {
+<span class="fc" id="L141">        long ts = System.currentTimeMillis();</span>
+<span class="fc" id="L142">        int rand = ThreadLocalRandom.current().nextInt(1000, 9999);</span>
+<span class="fc" id="L143">        return &quot;NO&quot; + ts + rand;</span>
+    }
+
+    /** Redis 库存回补（失败仅记录，不影响主流程） */
+    private void restoreRedisStock(String stockKey, int quantity) {
+        try {
+<span class="nc" id="L149">            stringRedisTemplate.opsForValue().increment(stockKey, quantity);</span>
+<span class="nc" id="L150">        } catch (Exception e) {</span>
+<span class="nc" id="L151">            log.warn(&quot;Redis 库存回补失败 key={}: {}&quot;, stockKey, e.getMessage());</span>
+<span class="nc" id="L152">        }</span>
+<span class="nc" id="L153">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

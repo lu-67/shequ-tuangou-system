@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>JwtAuthFilter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">community-groupbuy</a> &gt; <a href="index.source.html" class="el_package">com.community.groupbuy.config</a> &gt; <span class="el_source">JwtAuthFilter.java</span></div><h1>JwtAuthFilter.java</h1><pre class="source lang-java linenums">package com.community.groupbuy.config;
+
+import com.community.groupbuy.common.JwtUtils;
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
+import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
+import org.springframework.web.filter.OncePerRequestFilter;
+
+import java.io.IOException;
+import java.util.Collections;
+
+@Component
+<span class="fc" id="L21">public class JwtAuthFilter extends OncePerRequestFilter {</span>
+
+    @Autowired
+    private JwtUtils jwtUtils;
+
+    @Override
+    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
+            throws ServletException, IOException {
+
+        // 1. 从请求头获取 Authorization
+<span class="fc" id="L31">        String authHeader = request.getHeader(&quot;Authorization&quot;);</span>
+
+        // 2. 检查是否以 &quot;Bearer &quot; 开头
+<span class="pc bpc" id="L34" title="3 of 4 branches missed.">        if (StringUtils.hasText(authHeader) &amp;&amp; authHeader.startsWith(&quot;Bearer &quot;)) {</span>
+            // 截取 Token
+<span class="nc" id="L36">            String token = authHeader.substring(7);</span>
+
+            // 3. 解析 Token 获取用户信息
+<span class="nc" id="L39">            JwtUser jwtUser = jwtUtils.parseToken(token);</span>
+
+            // 4. 如果解析成功，且当前 Spring Security 上下文中没有用户，则放入上下文
+<span class="nc bnc" id="L42" title="All 4 branches missed.">            if (jwtUser != null &amp;&amp; SecurityContextHolder.getContext().getAuthentication() == null) {</span>
+                // 封装权限，Spring Security 默认会在角色前加 ROLE_
+<span class="nc" id="L44">                SimpleGrantedAuthority authority = new SimpleGrantedAuthority(&quot;ROLE_&quot; + jwtUser.getRole());</span>
+
+<span class="nc" id="L46">                UsernamePasswordAuthenticationToken authentication =</span>
+<span class="nc" id="L47">                        new UsernamePasswordAuthenticationToken(jwtUser, null, Collections.singletonList(authority));</span>
+
+<span class="nc" id="L49">                authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));</span>
+
+                // 核心：将认证信息存入上下文，代表该用户已登录
+<span class="nc" id="L52">                SecurityContextHolder.getContext().setAuthentication(authentication);</span>
+            }
+        }
+
+        // 5. 放行，进入下一个过滤器
+<span class="fc" id="L57">        filterChain.doFilter(request, response);</span>
+<span class="fc" id="L58">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

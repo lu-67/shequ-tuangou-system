@@ -1,0 +1,225 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PaymentService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">community-groupbuy</a> &gt; <a href="index.source.html" class="el_package">com.community.groupbuy.service</a> &gt; <span class="el_source">PaymentService.java</span></div><h1>PaymentService.java</h1><pre class="source lang-java linenums">package com.community.groupbuy.service;
+
+import com.community.groupbuy.common.BusinessException;
+import com.community.groupbuy.common.Constants;
+import com.community.groupbuy.common.PaySignUtils;
+import com.community.groupbuy.common.ResultCode;
+import com.community.groupbuy.dto.PaymentCallbackDTO;
+import com.community.groupbuy.dto.PaymentQueryDTO;
+import com.community.groupbuy.entity.GroupOrder;
+import com.community.groupbuy.entity.Payment;
+import com.community.groupbuy.mapper.ActivityMapper;
+import com.community.groupbuy.mapper.OrderMapper;
+import com.community.groupbuy.mapper.PaymentMapper;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+
+/**
+ * M4 支付与成团
+ *
+ * 三个关键点（报告「并发 / 幂等 / 事务」章节素材）：
+ * 1. 幂等发起支付：支付流水号按订单维度唯一，重复请求返回同一笔支付单；
+ * 2. 回调防重入账：支付单与订单均使用 CAS（WHERE status = 原状态）更新，
+ *    影响行数为 0 即判定为重放，直接返回成功、不重复入账；
+ * 3. 退款先 CAS 改订单状态，只有抢到锁（影响行数 = 1）才回补库存，
+ *    避免重复退款把库存无限加回去；整套操作在同一个事务里。
+ */
+<span class="fc" id="L32">@Slf4j</span>
+@Service
+<span class="fc" id="L34">@RequiredArgsConstructor</span>
+public class PaymentService {
+
+    private final OrderMapper orderMapper;
+    private final PaymentMapper paymentMapper;
+    private final ActivityMapper activityMapper;
+    private final ActivityService activityService;
+
+    /** 回调验签密钥：演示环境写死，生产用环境变量 APP_PAY_SECRET 注入 */
+    @Value(&quot;${app.pay.secret:community-groupbuy-pay-dev-secret-2026}&quot;)
+    private String paySecret;
+
+    /**
+     * 发起支付（幂等）：同一订单重复提交返回同一笔支付单。
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public Payment createPayment(Long orderId, String channel, Long operatorId, String operatorRole) {
+<span class="fc" id="L51">        GroupOrder order = requireOrder(orderId);</span>
+<span class="fc" id="L52">        assertOwnership(order, operatorId, operatorRole);</span>
+
+<span class="fc" id="L54">        String payNo = buildPayNo(order.getId());</span>
+<span class="fc" id="L55">        Payment exist = paymentMapper.selectByPayNo(payNo);</span>
+<span class="fc bfc" id="L56" title="All 2 branches covered.">        if (exist != null) {</span>
+<span class="fc" id="L57">            log.info(&quot;重复支付请求命中幂等: payNo={}, status={}&quot;, payNo, exist.getStatus());</span>
+<span class="fc" id="L58">            return exist;</span>
+        }
+<span class="fc bfc" id="L60" title="All 2 branches covered.">        if (!Constants.ORDER_UNPAID.equals(order.getStatus())) {</span>
+<span class="fc" id="L61">            throw new BusinessException(ResultCode.ORDER_STATUS_ERROR, &quot;当前订单状态不可支付: &quot; + order.getStatus());</span>
+        }
+
+<span class="fc" id="L64">        Payment payment = new Payment();</span>
+<span class="fc" id="L65">        payment.setPayNo(payNo);</span>
+<span class="fc" id="L66">        payment.setOrderId(order.getId());</span>
+<span class="fc" id="L67">        payment.setOrderNo(order.getOrderNo());</span>
+<span class="fc" id="L68">        payment.setAmount(order.getAmount());</span>
+<span class="pc bpc" id="L69" title="2 of 4 branches missed.">        payment.setChannel(channel == null || channel.isEmpty() ? Constants.PAY_CHANNEL_WECHAT : channel);</span>
+<span class="fc" id="L70">        payment.setStatus(Constants.PAY_PENDING);</span>
+<span class="fc" id="L71">        paymentMapper.insert(payment);</span>
+
+<span class="fc" id="L73">        log.info(&quot;支付单已创建: payNo={}, orderId={}, amount={}&quot;, payNo, order.getId(), order.getAmount());</span>
+<span class="fc" id="L74">        return payment;</span>
+    }
+
+    /**
+     * 支付回调（验签 + 幂等）：已成功过的回调重复到达时直接返回成功，不重复入账。
+     *
+     * @return true 表示入账成功或命中幂等；异常表示验签失败 / 金额不一致 / 订单状态异常
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public boolean handleCallback(PaymentCallbackDTO dto) {
+        // 1. 验签：payNo | orderNo | amount + 服务端密钥
+<span class="fc bfc" id="L85" title="All 2 branches covered.">        if (!PaySignUtils.verify(paySecret, dto.getSign(), dto.getPayNo(), dto.getOrderNo(),</span>
+<span class="fc" id="L86">                dto.getAmount().toPlainString())) {</span>
+<span class="fc" id="L87">            log.warn(&quot;支付回调验签失败: payNo={}, orderNo={}&quot;, dto.getPayNo(), dto.getOrderNo());</span>
+<span class="fc" id="L88">            throw new BusinessException(ResultCode.PAY_SIGN_ERROR);</span>
+        }
+
+<span class="fc" id="L91">        Payment payment = paymentMapper.selectByPayNo(dto.getPayNo());</span>
+<span class="fc bfc" id="L92" title="All 2 branches covered.">        if (payment == null) {</span>
+<span class="fc" id="L93">            throw new BusinessException(ResultCode.NOT_FOUND, &quot;支付流水不存在: &quot; + dto.getPayNo());</span>
+        }
+<span class="pc bpc" id="L95" title="1 of 2 branches missed.">        if (!payment.getOrderNo().equals(dto.getOrderNo())) {</span>
+<span class="nc" id="L96">            throw new BusinessException(ResultCode.PARAM_ERROR, &quot;订单号与支付流水不匹配&quot;);</span>
+        }
+<span class="fc bfc" id="L98" title="All 2 branches covered.">        if (payment.getAmount().compareTo(dto.getAmount()) != 0) {</span>
+<span class="fc" id="L99">            throw new BusinessException(ResultCode.PAY_AMOUNT_MISMATCH);</span>
+        }
+
+        // 2. 幂等：支付单已成功 / 已退款 → 不再入账
+<span class="fc bfc" id="L103" title="All 2 branches covered.">        if (Constants.PAY_SUCCESS.equals(payment.getStatus())) {</span>
+<span class="fc" id="L104">            log.info(&quot;回调重放，已入账过，直接返回成功: payNo={}&quot;, payment.getPayNo());</span>
+<span class="fc" id="L105">            return true;</span>
+        }
+<span class="fc bfc" id="L107" title="All 2 branches covered.">        if (Constants.PAY_REFUNDED.equals(payment.getStatus())) {</span>
+<span class="fc" id="L108">            throw new BusinessException(ResultCode.ORDER_STATUS_ERROR, &quot;该笔支付已退款，不可重复入账&quot;);</span>
+        }
+
+        // 3. 支付单 CAS：只有 PENDING → SUCCESS 抢到锁的一方继续走入账
+<span class="fc" id="L112">        int payRows = paymentMapper.markCallbackSuccess(payment.getPayNo(), Constants.PAY_PENDING, Constants.PAY_SUCCESS);</span>
+<span class="fc bfc" id="L113" title="All 2 branches covered.">        if (payRows == 0) {</span>
+<span class="fc" id="L114">            log.info(&quot;并发回调未抢到锁，按幂等返回: payNo={}&quot;, payment.getPayNo());</span>
+<span class="fc" id="L115">            return true;</span>
+        }
+
+        // 4. 订单 CAS：UNPAID → PAID，影响行数 0 说明订单已被支付过（并发重放）
+<span class="fc" id="L119">        GroupOrder order = requireOrder(payment.getOrderId());</span>
+<span class="fc" id="L120">        int orderRows = orderMapper.updateStatusCAS(order.getId(), Constants.ORDER_UNPAID, Constants.ORDER_PAID);</span>
+<span class="fc bfc" id="L121" title="All 2 branches covered.">        if (orderRows == 0) {</span>
+<span class="fc bfc" id="L122" title="All 2 branches covered.">            if (Constants.ORDER_PAID.equals(order.getStatus())) {</span>
+<span class="fc" id="L123">                log.info(&quot;订单已支付，回调按幂等返回: orderId={}&quot;, order.getId());</span>
+<span class="fc" id="L124">                return true;</span>
+            }
+<span class="fc" id="L126">            throw new BusinessException(ResultCode.ORDER_STATUS_ERROR, &quot;订单状态异常，支付结果不予入账: &quot; + order.getStatus());</span>
+        }
+
+        // 5. 已参团份数：不新增字段，用已支付订单汇总 —— 支付成功一笔即自动 +1 份
+        //    （不可用 total_stock - stock 代替，那个口径含未支付订单）
+<span class="fc" id="L131">        long joinedQuantity = orderMapper.sumPaidQuantity(order.getActivityId());</span>
+
+        // 6. 实时成团判定：已参团份数达到 total_stock 即成团；未达标返回 false 不报错，
+        //    由 M8 定时任务继续兜底（到期判定 / 事件丢失补偿），两条路径 CAS 幂等互不冲突
+<span class="fc" id="L135">        activityService.markSuccessIfReached(order.getActivityId());</span>
+
+<span class="fc" id="L137">        log.info(&quot;支付回调入账成功: payNo={}, orderId={}, amount={}, 活动已参团份数={}&quot;,</span>
+<span class="fc" id="L138">                payment.getPayNo(), order.getId(), order.getAmount(), joinedQuantity);</span>
+<span class="fc" id="L139">        return true;</span>
+    }
+
+    /**
+     * 退款：订单 PAID → CANCELLED（CAS）+ 回补活动库存，全程同一事务。
+     * 只有订单状态抢占成功才回补库存，避免重复退款造成库存虚增。
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public void refund(Long paymentId, Long operatorId, String operatorRole) {
+<span class="fc" id="L148">        Payment payment = paymentMapper.selectById(paymentId);</span>
+<span class="fc bfc" id="L149" title="All 2 branches covered.">        if (payment == null) {</span>
+<span class="fc" id="L150">            throw new BusinessException(ResultCode.NOT_FOUND, &quot;支付记录不存在&quot;);</span>
+        }
+<span class="fc" id="L152">        GroupOrder order = requireOrder(payment.getOrderId());</span>
+<span class="fc" id="L153">        assertOwnership(order, operatorId, operatorRole);</span>
+
+<span class="fc bfc" id="L155" title="All 2 branches covered.">        if (Constants.PAY_REFUNDED.equals(payment.getStatus())) {</span>
+<span class="fc" id="L156">            log.info(&quot;重复退款请求命中幂等: payNo={}&quot;, payment.getPayNo());</span>
+<span class="fc" id="L157">            return;</span>
+        }
+<span class="fc bfc" id="L159" title="All 2 branches covered.">        if (!Constants.PAY_SUCCESS.equals(payment.getStatus())) {</span>
+<span class="fc" id="L160">            throw new BusinessException(ResultCode.ORDER_STATUS_ERROR, &quot;仅支付成功的订单可退款，当前支付状态: &quot; + payment.getStatus());</span>
+        }
+<span class="pc bpc" id="L162" title="1 of 2 branches missed.">        if (!Constants.ORDER_PAID.equals(order.getStatus())) {</span>
+<span class="nc" id="L163">            throw new BusinessException(ResultCode.ORDER_STATUS_ERROR, &quot;仅已支付订单可退款，当前订单状态: &quot; + order.getStatus());</span>
+        }
+
+        // 先抢订单状态，抢到才回补库存
+<span class="fc" id="L167">        int rows = orderMapper.updateStatusCAS(order.getId(), Constants.ORDER_PAID, Constants.ORDER_CANCELLED);</span>
+<span class="fc bfc" id="L168" title="All 2 branches covered.">        if (rows == 0) {</span>
+<span class="fc" id="L169">            throw new BusinessException(ResultCode.ORDER_STATUS_ERROR, &quot;订单状态已被变更，退款失败&quot;);</span>
+        }
+<span class="fc" id="L171">        activityMapper.incrementStock(order.getActivityId(), order.getQuantity());</span>
+<span class="fc" id="L172">        paymentMapper.updateStatusCAS(payment.getPayNo(), Constants.PAY_SUCCESS, Constants.PAY_REFUNDED);</span>
+
+<span class="fc" id="L174">        log.info(&quot;退款完成: payNo={}, orderId={}, 库存回补={}&quot;, payment.getPayNo(), order.getId(), order.getQuantity());</span>
+<span class="fc" id="L175">    }</span>
+
+    public Payment getPayment(Long id) {
+<span class="nc" id="L178">        Payment payment = paymentMapper.selectById(id);</span>
+<span class="nc bnc" id="L179" title="All 2 branches missed.">        if (payment == null) {</span>
+<span class="nc" id="L180">            throw new BusinessException(ResultCode.NOT_FOUND, &quot;支付记录不存在&quot;);</span>
+        }
+<span class="nc" id="L182">        return payment;</span>
+    }
+
+    /** 支付记录分页查询（动态条件） */
+    public List&lt;Payment&gt; list(PaymentQueryDTO query) {
+<span class="fc" id="L187">        return paymentMapper.selectByCondition(query);</span>
+    }
+
+    public long count(PaymentQueryDTO query) {
+<span class="fc" id="L191">        return paymentMapper.countByCondition(query);</span>
+    }
+
+    /**
+     * 生成演示用签名（仅供 Knife4j 自测回调接口，生产环境应移除）。
+     * 字段顺序必须与 PaySignUtils 一致：payNo | orderNo | amount
+     */
+    public String demoSign(String payNo, String orderNo, String amount) {
+<span class="fc" id="L199">        return PaySignUtils.sign(paySecret, payNo, orderNo, amount);</span>
+    }
+
+    /** 支付流水号按订单维度固定，保证重复支付命中同一笔流水 */
+    private String buildPayNo(Long orderId) {
+<span class="fc" id="L204">        return Constants.PAY_NO_PREFIX + orderId;</span>
+    }
+
+    private GroupOrder requireOrder(Long orderId) {
+<span class="fc" id="L208">        GroupOrder order = orderMapper.selectById(orderId);</span>
+<span class="fc bfc" id="L209" title="All 2 branches covered.">        if (order == null) {</span>
+<span class="fc" id="L210">            throw new BusinessException(ResultCode.ORDER_NOT_FOUND);</span>
+        }
+<span class="fc" id="L212">        return order;</span>
+    }
+
+    /** 管理员可操作任意订单，普通用户只能操作自己的订单 */
+    private void assertOwnership(GroupOrder order, Long operatorId, String operatorRole) {
+<span class="pc bpc" id="L217" title="1 of 2 branches missed.">        if (Constants.ROLE_ADMIN.equals(operatorRole)) {</span>
+<span class="nc" id="L218">            return;</span>
+        }
+<span class="pc bpc" id="L220" title="1 of 4 branches missed.">        if (operatorId == null || !operatorId.equals(order.getUserId())) {</span>
+<span class="fc" id="L221">            throw new BusinessException(ResultCode.FORBIDDEN, &quot;无权操作他人订单&quot;);</span>
+        }
+<span class="fc" id="L223">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

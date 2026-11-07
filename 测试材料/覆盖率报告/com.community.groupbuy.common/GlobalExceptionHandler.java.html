@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GlobalExceptionHandler.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">community-groupbuy</a> &gt; <a href="index.source.html" class="el_package">com.community.groupbuy.common</a> &gt; <span class="el_source">GlobalExceptionHandler.java</span></div><h1>GlobalExceptionHandler.java</h1><pre class="source lang-java linenums">package com.community.groupbuy.common;
+
+import jakarta.servlet.http.HttpServletRequest;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.AuthenticationException;
+import org.springframework.validation.BindException;
+import org.springframework.validation.FieldError;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
+
+/**
+ * 全局异常处理器：统一把异常转换为 Result 结构
+ */
+<span class="fc" id="L19">@Slf4j</span>
+@RestControllerAdvice
+<span class="fc" id="L21">public class GlobalExceptionHandler {</span>
+
+    /** 业务异常 */
+    @ExceptionHandler(BusinessException.class)
+    public Result&lt;Void&gt; handleBusiness(BusinessException ex) {
+<span class="fc" id="L26">        log.warn(&quot;业务异常: code={}, msg={}&quot;, ex.getCode(), ex.getMessage());</span>
+<span class="fc" id="L27">        return Result.error(ex.getCode(), ex.getMessage());</span>
+    }
+
+    /** 参数校验失败 (@Valid) */
+    @ExceptionHandler({MethodArgumentNotValidException.class, BindException.class})
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public Result&lt;Void&gt; handleValid(Exception ex) {
+<span class="fc" id="L34">        String msg = &quot;参数校验失败&quot;;</span>
+<span class="pc bpc" id="L35" title="1 of 2 branches missed.">        if (ex instanceof MethodArgumentNotValidException m) {</span>
+<span class="fc" id="L36">            FieldError fe = m.getBindingResult().getFieldError();</span>
+<span class="pc bpc" id="L37" title="1 of 2 branches missed.">            if (fe != null) msg = fe.getDefaultMessage();</span>
+<span class="pc bnc" id="L38" title="All 2 branches missed.">        } else if (ex instanceof BindException b) {</span>
+<span class="nc" id="L39">            FieldError fe = b.getBindingResult().getFieldError();</span>
+<span class="nc bnc" id="L40" title="All 2 branches missed.">            if (fe != null) msg = fe.getDefaultMessage();</span>
+        }
+<span class="fc" id="L42">        log.warn(&quot;参数校验失败: {}&quot;, msg);</span>
+<span class="fc" id="L43">        return Result.error(ResultCode.PARAM_ERROR.getCode(), msg);</span>
+    }
+
+    /** 请求体解析失败（JSON 格式错误、日期格式不匹配等） */
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public Result&lt;Void&gt; handleNotReadable(HttpMessageNotReadableException ex) {
+<span class="nc" id="L50">        log.warn(&quot;请求体解析失败: {}&quot;, ex.getMessage());</span>
+<span class="nc" id="L51">        return Result.error(ResultCode.PARAM_ERROR.getCode(),</span>
+                &quot;请求参数格式错误，日期时间请使用 yyyy-MM-dd HH:mm:ss 格式&quot;);
+    }
+
+    /** 鉴权失败（未登录 / token 失效）：方法级鉴权抛出的 AuthenticationException */
+    @ExceptionHandler(AuthenticationException.class)
+    @ResponseStatus(HttpStatus.UNAUTHORIZED)
+    public Result&lt;Void&gt; handleAuthentication(AuthenticationException ex) {
+<span class="nc" id="L59">        log.warn(&quot;鉴权失败: {}&quot;, ex.getMessage());</span>
+<span class="nc" id="L60">        return Result.error(ResultCode.UNAUTHORIZED);</span>
+    }
+
+    /** 越权访问：已登录但角色不足（@PreAuthorize 不通过） */
+    @ExceptionHandler(AccessDeniedException.class)
+    @ResponseStatus(HttpStatus.FORBIDDEN)
+    public Result&lt;Void&gt; handleAccessDenied(AccessDeniedException ex) {
+<span class="fc" id="L67">        log.warn(&quot;越权访问: {}&quot;, ex.getMessage());</span>
+<span class="fc" id="L68">        return Result.error(ResultCode.FORBIDDEN);</span>
+    }
+
+    /** 其余未捕获异常 */
+    @ExceptionHandler(Exception.class)
+    @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
+    public Result&lt;Void&gt; handleOther(Exception ex, HttpServletRequest request) {
+<span class="nc" id="L75">        log.error(&quot;系统异常 uri={}&quot;, request.getRequestURI(), ex);</span>
+<span class="nc" id="L76">        return Result.error(ResultCode.SYSTEM_ERROR);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

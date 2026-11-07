@@ -1,0 +1,193 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ActivityService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">community-groupbuy</a> &gt; <a href="index.source.html" class="el_package">com.community.groupbuy.service</a> &gt; <span class="el_source">ActivityService.java</span></div><h1>ActivityService.java</h1><pre class="source lang-java linenums">package com.community.groupbuy.service;
+
+import com.community.groupbuy.common.BusinessException;
+import com.community.groupbuy.common.Constants;
+import com.community.groupbuy.common.ResultCode;
+import com.community.groupbuy.dto.ActivityQueryDTO;
+import com.community.groupbuy.dto.CreateActivityDTO;
+import com.community.groupbuy.dto.PageResult;
+import com.community.groupbuy.entity.GroupActivity;
+import com.community.groupbuy.mapper.ActivityMapper;
+import com.community.groupbuy.mapper.OrderMapper;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+
+/**
+ * M2 开团活动：创建 / 状态机流转 / 分页查询 / 进行中列表
+ */
+<span class="fc" id="L22">@Slf4j</span>
+@Service
+<span class="fc" id="L24">@RequiredArgsConstructor</span>
+public class ActivityService {
+
+    private final ActivityMapper activityMapper;
+
+    private final OrderMapper orderMapper;
+
+    /** M7：库存预热 / 清除（C 同学） */
+    private final StockCacheService stockCacheService;
+
+    /** M7：活动详情 Cache-Aside（C 同学） */
+    private final CacheService cacheService;
+
+    /**
+     * 创建开团活动（团长 / 管理员）。
+     * 新建活动为 PENDING，需调用 updateStatus 流转到 ONGOING 后才可被参团下单。
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public Long createActivity(CreateActivityDTO dto, Long operatorId, String operatorRole) {
+<span class="fc" id="L43">        assertHeadOrAdmin(operatorRole);</span>
+<span class="fc" id="L44">        validateCreateParam(dto);</span>
+<span class="fc" id="L45">        GroupActivity activity = buildActivity(dto, operatorId);</span>
+<span class="fc" id="L46">        activityMapper.insert(activity);</span>
+        // M7：初始状态若已是 ONGOING，立即预热库存（当前创建固定 PENDING，此处为保护性判断）
+<span class="pc bpc" id="L48" title="1 of 2 branches missed.">        if (Constants.ACTIVITY_ONGOING.equals(activity.getStatus())) {</span>
+<span class="nc" id="L49">            stockCacheService.preheat(activity.getId(), activity.getStock());</span>
+        }
+<span class="fc" id="L51">        log.info(&quot;开团活动创建成功: id={}, title={}, operatorId={}&quot;, activity.getId(), activity.getTitle(), operatorId);</span>
+<span class="fc" id="L52">        return activity.getId();</span>
+    }
+
+    /**
+     * 活动状态流转：枚举 + 转移表断言 + DB CAS，非法流转抛 2004。
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public void updateStatus(Long activityId, String targetStatus, String operatorRole) {
+<span class="fc" id="L60">        assertHeadOrAdmin(operatorRole);</span>
+<span class="fc" id="L61">        ActivityStatus target = ActivityStatus.of(targetStatus);</span>
+<span class="fc" id="L62">        GroupActivity activity = requireActivity(activityId);</span>
+<span class="fc" id="L63">        ActivityStatus current = ActivityStatus.of(activity.getStatus());</span>
+<span class="fc" id="L64">        current.assertCanTransferTo(target);</span>
+
+<span class="fc" id="L66">        int rows = activityMapper.updateStatusCAS(activityId, current.name(), target.name());</span>
+<span class="fc bfc" id="L67" title="All 2 branches covered.">        if (rows != 1) {</span>
+<span class="fc" id="L68">            throw new BusinessException(ResultCode.ACTIVITY_STATUS_ERROR, &quot;活动状态已被其他操作变更，请刷新后重试&quot;);</span>
+        }
+        // M7：进入 ONGOING 预热库存；SUCCESS/FAILED 清除预热；活动详情缓存一律失效
+<span class="fc" id="L71">        syncStockCacheOnTransfer(activity, target);</span>
+<span class="fc" id="L72">        cacheService.evict(Constants.REDIS_CACHE_ACTIVITY_PREFIX + activityId);</span>
+<span class="fc" id="L73">        log.info(&quot;活动状态流转成功: id={}, {} -&gt; {}, operator={}&quot;, activityId, current.name(), target.name(), operatorRole);</span>
+<span class="fc" id="L74">    }</span>
+
+    /**
+     * 活动详情（M7 缓存）：Cache-Aside + 分布式锁回源 + 随机 TTL。
+     * 库存变化频繁，TTL 取 20 秒；状态流转会主动失效该 key。
+     */
+    public GroupActivity getActivity(Long activityId) {
+<span class="nc" id="L81">        return cacheService.getOrLoad(Constants.REDIS_CACHE_ACTIVITY_PREFIX + activityId, GroupActivity.class,</span>
+<span class="nc" id="L82">                Constants.CACHE_ACTIVITY_TTL_SECONDS, () -&gt; requireActivity(activityId));</span>
+    }
+
+    /** 动态条件分页查询 */
+    public PageResult&lt;GroupActivity&gt; page(ActivityQueryDTO query) {
+<span class="fc" id="L87">        long total = activityMapper.countByCondition(query);</span>
+<span class="fc bfc" id="L88" title="All 2 branches covered.">        List&lt;GroupActivity&gt; list = total == 0 ? List.of() : activityMapper.selectByCondition(query);</span>
+<span class="pc bpc" id="L89" title="1 of 2 branches missed.">        return PageResult.of(total, query.getPageNum() == null ? 1 : query.getPageNum(),</span>
+<span class="pc bpc" id="L90" title="1 of 2 branches missed.">                query.getPageSize() == null ? 10 : query.getPageSize(), list);</span>
+    }
+
+    /** 进行中活动列表（居民端首页） */
+    public List&lt;GroupActivity&gt; listOngoing() {
+<span class="fc" id="L95">        return activityMapper.selectOngoing();</span>
+    }
+
+    /** 团长/管理员：我创建的活动（全部状态），用于前台「我的开团」页面 */
+    public List&lt;GroupActivity&gt; listMyActivities(Long userId, String role) {
+<span class="nc" id="L100">        assertHeadOrAdmin(role);</span>
+<span class="nc" id="L101">        return activityMapper.selectByCreator(userId);</span>
+    }
+
+    /**
+     * 成团判定（全项目唯一口径）：「已参团份数」达到 total_stock 时，把 ONGOING 活动判定为 SUCCESS。
+     *
+     * 已参团份数 = 该活动已支付（PAID）订单的数量汇总，不新增字段（约定：不改表结构），
+     * 因此支付成功一笔，已参团份数自动 +1 份 —— 即需求里的「支付成功后已参团人数 +1」。
+     * 注意：不可用 total_stock - stock 代替，那个口径把未支付订单也算进去了。
+     *
+     * 供 M4 支付成功（实时判定）与 M8 定时任务（兜底判定）共用；
+     * 状态流转走 CAS，并发下只有一方生效，未抢到的一方返回 false，不报错（幂等）。
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public boolean markSuccessIfReached(Long activityId) {
+<span class="fc" id="L116">        GroupActivity activity = activityMapper.selectById(activityId);</span>
+<span class="fc bfc" id="L117" title="All 4 branches covered.">        if (activity == null || !Constants.ACTIVITY_ONGOING.equals(activity.getStatus())) {</span>
+<span class="fc" id="L118">            return false;</span>
+        }
+<span class="fc" id="L120">        long joinedQuantity = orderMapper.sumPaidQuantity(activityId);</span>
+<span class="fc bfc" id="L121" title="All 2 branches covered.">        if (joinedQuantity &lt; activity.getTotalStock()) {</span>
+<span class="fc" id="L122">            log.info(&quot;活动暂未成团: activityId={}, 已参团={}/{}&quot;,</span>
+<span class="fc" id="L123">                    activityId, joinedQuantity, activity.getTotalStock());</span>
+<span class="fc" id="L124">            return false;</span>
+        }
+<span class="fc" id="L126">        int rows = activityMapper.updateStatusCAS(activityId, Constants.ACTIVITY_ONGOING, Constants.ACTIVITY_SUCCESS);</span>
+<span class="fc bfc" id="L127" title="All 2 branches covered.">        if (rows == 1) {</span>
+            // M7：已成团，清除库存预热与详情缓存（活动不再接受下单）
+<span class="fc" id="L129">            stockCacheService.evict(activityId);</span>
+<span class="fc" id="L130">            cacheService.evict(Constants.REDIS_CACHE_ACTIVITY_PREFIX + activityId);</span>
+<span class="fc" id="L131">            log.info(&quot;活动已成团: activityId={}, 已参团={}/{}&quot;,</span>
+<span class="fc" id="L132">                    activityId, joinedQuantity, activity.getTotalStock());</span>
+        }
+<span class="fc bfc" id="L134" title="All 2 branches covered.">        return rows == 1;</span>
+    }
+
+    /** M7：状态流转后同步库存缓存（ONGOING 预热，SUCCESS/FAILED 清除） */
+    private void syncStockCacheOnTransfer(GroupActivity activity, ActivityStatus target) {
+<span class="fc bfc" id="L139" title="All 2 branches covered.">        if (target == ActivityStatus.ONGOING) {</span>
+<span class="fc" id="L140">            stockCacheService.preheat(activity.getId(), activity.getStock());</span>
+<span class="pc bpc" id="L141" title="3 of 4 branches missed.">        } else if (target == ActivityStatus.SUCCESS || target == ActivityStatus.FAILED) {</span>
+<span class="fc" id="L142">            stockCacheService.evict(activity.getId());</span>
+        }
+<span class="fc" id="L144">    }</span>
+
+<span class="fc" id="L146">    private GroupActivity requireActivity(Long activityId) {        GroupActivity activity = activityMapper.selectById(activityId);</span>
+<span class="fc bfc" id="L147" title="All 2 branches covered.">        if (activity == null) {</span>
+<span class="fc" id="L148">            throw new BusinessException(ResultCode.ACTIVITY_NOT_FOUND);</span>
+        }
+<span class="fc" id="L150">        return activity;</span>
+    }
+
+    private void assertHeadOrAdmin(String role) {
+<span class="fc bfc" id="L154" title="All 4 branches covered.">        if (!Constants.ROLE_ADMIN.equals(role) &amp;&amp; !Constants.ROLE_HEAD.equals(role)) {</span>
+<span class="fc" id="L155">            throw new BusinessException(ResultCode.FORBIDDEN, &quot;仅团长或管理员可管理团购活动&quot;);</span>
+        }
+<span class="fc" id="L157">    }</span>
+
+    private void validateCreateParam(CreateActivityDTO dto) {
+<span class="pc bpc" id="L160" title="1 of 4 branches missed.">        if (dto.getTotalStock() == null || dto.getTotalStock() &lt; 1) {</span>
+<span class="fc" id="L161">            throw new BusinessException(ResultCode.PARAM_ERROR, &quot;活动总库存至少为1&quot;);</span>
+        }
+<span class="fc bfc" id="L163" title="All 2 branches covered.">        if (dto.getGroupPrice().compareTo(dto.getOriginPrice()) &gt; 0) {</span>
+<span class="fc" id="L164">            throw new BusinessException(ResultCode.PARAM_ERROR, &quot;团购价不能高于原价&quot;);</span>
+        }
+<span class="pc bpc" id="L166" title="2 of 4 branches missed.">        if (dto.getStartTime() == null || dto.getEndTime() == null) {</span>
+<span class="nc" id="L167">            throw new BusinessException(ResultCode.PARAM_ERROR, &quot;活动时间不能为空&quot;);</span>
+        }
+<span class="fc bfc" id="L169" title="All 2 branches covered.">        if (!dto.getEndTime().isAfter(dto.getStartTime())) {</span>
+<span class="fc" id="L170">            throw new BusinessException(ResultCode.PARAM_ERROR, &quot;活动结束时间必须晚于开始时间&quot;);</span>
+        }
+<span class="pc bpc" id="L172" title="2 of 4 branches missed.">        if (dto.getPerLimit() != null &amp;&amp; dto.getPerLimit() &lt; 1) {</span>
+<span class="nc" id="L173">            throw new BusinessException(ResultCode.PARAM_ERROR, &quot;每人限购至少为1&quot;);</span>
+        }
+<span class="fc" id="L175">    }</span>
+
+    private GroupActivity buildActivity(CreateActivityDTO dto, Long operatorId) {
+<span class="fc" id="L178">        GroupActivity activity = new GroupActivity();</span>
+<span class="fc" id="L179">        activity.setCreatorId(operatorId);</span>
+<span class="fc" id="L180">        activity.setProductId(dto.getProductId());</span>
+<span class="fc" id="L181">        activity.setTitle(dto.getTitle());</span>
+<span class="fc" id="L182">        activity.setOriginPrice(dto.getOriginPrice());</span>
+<span class="fc" id="L183">        activity.setGroupPrice(dto.getGroupPrice());</span>
+<span class="fc" id="L184">        activity.setTotalStock(dto.getTotalStock());</span>
+<span class="fc" id="L185">        activity.setStock(dto.getTotalStock());</span>
+<span class="pc bpc" id="L186" title="1 of 2 branches missed.">        activity.setPerLimit(dto.getPerLimit() == null ? 5 : dto.getPerLimit());</span>
+<span class="fc" id="L187">        activity.setStatus(ActivityStatus.PENDING.name());</span>
+<span class="fc" id="L188">        activity.setStartTime(dto.getStartTime());</span>
+<span class="fc" id="L189">        activity.setEndTime(dto.getEndTime());</span>
+<span class="fc" id="L190">        return activity;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

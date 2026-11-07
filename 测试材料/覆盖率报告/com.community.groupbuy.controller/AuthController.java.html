@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AuthController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">community-groupbuy</a> &gt; <a href="index.source.html" class="el_package">com.community.groupbuy.controller</a> &gt; <span class="el_source">AuthController.java</span></div><h1>AuthController.java</h1><pre class="source lang-java linenums">package com.community.groupbuy.controller;
+
+import com.community.groupbuy.common.JwtUtils;
+import com.community.groupbuy.config.JwtUser;
+import com.community.groupbuy.dto.LoginDTO;
+import com.community.groupbuy.common.BusinessException;
+import com.community.groupbuy.common.ResultCode;
+import com.community.groupbuy.entity.SysUser;
+import com.community.groupbuy.mapper.SysUserMapper;
+import jakarta.validation.Valid;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.HashMap;
+import java.util.Map;
+
+@RestController
+@RequestMapping(&quot;/api/auth&quot;)
+<span class="fc" id="L20">public class AuthController {</span>
+
+    @Autowired
+    private SysUserMapper sysUserMapper;
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+
+    @Autowired
+    private JwtUtils jwtUtils;
+
+    /**
+     * 用户登录接口
+     */
+    @PostMapping(&quot;/login&quot;)
+    public Map&lt;String, Object&gt; login(@Valid @RequestBody LoginDTO loginDTO) {
+        // 1. 查数据库
+<span class="fc" id="L37">        SysUser user = sysUserMapper.selectByUsername(loginDTO.getUsername());</span>
+<span class="fc bfc" id="L38" title="All 2 branches covered.">        if (user == null) {</span>
+<span class="fc" id="L39">            throw new BusinessException(ResultCode.PASSWORD_ERROR);</span>
+        }
+
+        // 2. 校验密码 (matches 会自动比对明文和数据库里的密文)
+<span class="fc bfc" id="L43" title="All 2 branches covered.">        if (!passwordEncoder.matches(loginDTO.getPassword(), user.getPassword())) {</span>
+<span class="fc" id="L44">            throw new BusinessException(ResultCode.PASSWORD_ERROR);</span>
+        }
+
+        // 3. 生成 Token
+<span class="fc" id="L48">        JwtUser jwtUser = new JwtUser(user.getId(), user.getUsername(), user.getRole(), user.getPassword());</span>
+<span class="fc" id="L49">        String token = jwtUtils.generateToken(jwtUser);</span>
+
+        // 4. 返回结果
+<span class="fc" id="L52">        Map&lt;String, Object&gt; result = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L53">        result.put(&quot;code&quot;, 200);</span>
+<span class="fc" id="L54">        result.put(&quot;message&quot;, &quot;登录成功&quot;);</span>
+
+<span class="fc" id="L56">        Map&lt;String, Object&gt; data = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L57">        data.put(&quot;token&quot;, token);</span>
+<span class="fc" id="L58">        data.put(&quot;role&quot;, user.getRole());</span>
+<span class="fc" id="L59">        data.put(&quot;username&quot;, user.getUsername());</span>
+<span class="fc" id="L60">        result.put(&quot;data&quot;, data);</span>
+
+<span class="fc" id="L62">        return result;</span>
+    }
+
+    /**
+     * 用户注册接口
+     */
+    @PostMapping(&quot;/register&quot;)
+    public Map&lt;String, Object&gt; register(@RequestBody SysUser user) {
+        // 1. 检查用户名是否重复
+<span class="fc" id="L71">        SysUser existUser = sysUserMapper.selectByUsername(user.getUsername());</span>
+<span class="fc bfc" id="L72" title="All 2 branches covered.">        if (existUser != null) {</span>
+<span class="fc" id="L73">            throw new BusinessException(ResultCode.USER_EXISTS);</span>
+        }
+
+        // 2. 密码加密
+<span class="fc" id="L77">        String encodedPassword = passwordEncoder.encode(user.getPassword());</span>
+<span class="fc" id="L78">        user.setPassword(encodedPassword);</span>
+
+        // 3. 设置默认角色（如果前端没传，默认是居民 RESIDENT）
+<span class="pc bpc" id="L81" title="3 of 4 branches missed.">        if (user.getRole() == null || user.getRole().isEmpty()) {</span>
+<span class="fc" id="L82">            user.setRole(&quot;RESIDENT&quot;);</span>
+        }
+<span class="pc bpc" id="L84" title="1 of 2 branches missed.">        if (user.getNickname() == null) {</span>
+<span class="fc" id="L85">            user.setNickname(user.getUsername());</span>
+        }
+
+        // 4. 插入数据库
+<span class="fc" id="L89">        sysUserMapper.insert(user);</span>
+
+        // 5. 返回结果
+<span class="fc" id="L92">        Map&lt;String, Object&gt; result = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L93">        result.put(&quot;code&quot;, 200);</span>
+<span class="fc" id="L94">        result.put(&quot;message&quot;, &quot;注册成功&quot;);</span>
+<span class="fc" id="L95">        return result;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

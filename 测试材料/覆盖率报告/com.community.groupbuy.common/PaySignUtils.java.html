@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PaySignUtils.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">community-groupbuy</a> &gt; <a href="index.source.html" class="el_package">com.community.groupbuy.common</a> &gt; <span class="el_source">PaySignUtils.java</span></div><h1>PaySignUtils.java</h1><pre class="source lang-java linenums">package com.community.groupbuy.common;
+
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
+import java.nio.charset.StandardCharsets;
+
+/**
+ * 支付回调验签工具（HMAC-SHA256）
+ *
+ * 说明：payment 表没有签名字段，验签采用「请求参数 + 服务端密钥」计算摘要比对的方式，
+ * 密钥来自配置 app.pay.secret（生产环境用环境变量注入，不写死在配置文件里）。
+ */
+public final class PaySignUtils {
+
+    private static final String ALGORITHM = &quot;HmacSHA256&quot;;
+
+    private PaySignUtils() {
+    }
+
+    /**
+     * 计算签名：把参与签名的字段用 | 拼接后做 HMAC-SHA256，输出小写十六进制。
+     * 字段顺序固定为 payNo | orderNo | amount，回调方必须按同样顺序拼接。
+     */
+    public static String sign(String secret, String... parts) {
+        try {
+<span class="fc" id="L26">            Mac mac = Mac.getInstance(ALGORITHM);</span>
+<span class="fc" id="L27">            mac.init(new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), ALGORITHM));</span>
+<span class="fc" id="L28">            byte[] digest = mac.doFinal(String.join(&quot;|&quot;, parts).getBytes(StandardCharsets.UTF_8));</span>
+<span class="fc" id="L29">            StringBuilder hex = new StringBuilder(digest.length * 2);</span>
+<span class="fc bfc" id="L30" title="All 2 branches covered.">            for (byte b : digest) {</span>
+<span class="fc" id="L31">                hex.append(String.format(&quot;%02x&quot;, b));</span>
+            }
+<span class="fc" id="L33">            return hex.toString();</span>
+<span class="nc" id="L34">        } catch (Exception e) {</span>
+<span class="nc" id="L35">            throw new BusinessException(ResultCode.SYSTEM_ERROR, &quot;支付签名计算失败&quot;);</span>
+        }
+    }
+
+    /** 校验签名（忽略大小写，兼容大写十六进制） */
+    public static boolean verify(String secret, String expected, String... parts) {
+<span class="pc bpc" id="L41" title="2 of 4 branches missed.">        if (expected == null || expected.isEmpty()) {</span>
+<span class="nc" id="L42">            return false;</span>
+        }
+<span class="fc" id="L44">        return sign(secret, parts).equalsIgnoreCase(expected);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

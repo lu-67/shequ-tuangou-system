@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PickupPointService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">community-groupbuy</a> &gt; <a href="index.source.html" class="el_package">com.community.groupbuy.service</a> &gt; <span class="el_source">PickupPointService.java</span></div><h1>PickupPointService.java</h1><pre class="source lang-java linenums">package com.community.groupbuy.service;
+
+import com.community.groupbuy.common.BusinessException;
+import com.community.groupbuy.common.Constants;
+import com.community.groupbuy.common.ResultCode;
+import com.community.groupbuy.dto.PickupPointDTO;
+import com.community.groupbuy.entity.PickupPoint;
+import com.community.groupbuy.mapper.PickupPointMapper;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+
+/**
+ * M5 自提点管理：列表（居民端首页）/ 详情 / 新增 / 修改 / 删除
+ *
+ * 写操作仅 ADMIN / HEAD；已有核销记录的自提点禁止删除。
+ */
+<span class="fc" id="L21">@Slf4j</span>
+@Service
+<span class="fc" id="L23">@RequiredArgsConstructor</span>
+public class PickupPointService {
+
+    private final PickupPointMapper pickupPointMapper;
+
+    /** 自提点列表（居民端首页、我的订单、管理后台共用），name 可选模糊 */
+    public List&lt;PickupPoint&gt; list(String name) {
+<span class="fc" id="L30">        return pickupPointMapper.selectByCondition(name);</span>
+    }
+
+    public PickupPoint getById(Long id) {
+<span class="nc" id="L34">        return requirePoint(id);</span>
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public Long create(PickupPointDTO dto, String operatorRole) {
+<span class="fc" id="L39">        assertAdminOrHead(operatorRole);</span>
+<span class="fc" id="L40">        PickupPoint point = build(dto);</span>
+<span class="fc" id="L41">        pickupPointMapper.insert(point);</span>
+<span class="fc" id="L42">        log.info(&quot;自提点创建成功: id={}, name={}, operator={}&quot;, point.getId(), point.getName(), operatorRole);</span>
+<span class="fc" id="L43">        return point.getId();</span>
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public void update(Long id, PickupPointDTO dto, String operatorRole) {
+<span class="fc" id="L48">        assertAdminOrHead(operatorRole);</span>
+<span class="fc" id="L49">        requirePoint(id);</span>
+<span class="fc" id="L50">        PickupPoint point = build(dto);</span>
+<span class="fc" id="L51">        point.setId(id);</span>
+<span class="fc" id="L52">        int rows = pickupPointMapper.update(point);</span>
+<span class="pc bpc" id="L53" title="1 of 2 branches missed.">        if (rows != 1) {</span>
+<span class="nc" id="L54">            throw new BusinessException(ResultCode.PICKUP_POINT_NOT_FOUND, &quot;自提点已被删除，更新失败&quot;);</span>
+        }
+<span class="fc" id="L56">        log.info(&quot;自提点更新成功: id={}, name={}, operator={}&quot;, id, point.getName(), operatorRole);</span>
+<span class="fc" id="L57">    }</span>
+
+    @Transactional(rollbackFor = Exception.class)
+    public void delete(Long id, String operatorRole) {
+<span class="fc" id="L61">        assertAdminOrHead(operatorRole);</span>
+<span class="fc" id="L62">        requirePoint(id);</span>
+<span class="fc" id="L63">        long refs = pickupPointMapper.countVerificationRef(id);</span>
+<span class="fc bfc" id="L64" title="All 2 branches covered.">        if (refs &gt; 0) {</span>
+<span class="fc" id="L65">            throw new BusinessException(ResultCode.PICKUP_POINT_REFERENCED,</span>
+                    &quot;该自提点已有 &quot; + refs + &quot; 条核销记录，不可删除&quot;);
+        }
+<span class="fc" id="L68">        pickupPointMapper.deleteById(id);</span>
+<span class="fc" id="L69">        log.info(&quot;自提点删除成功: id={}, operator={}&quot;, id, operatorRole);</span>
+<span class="fc" id="L70">    }</span>
+
+    private PickupPoint requirePoint(Long id) {
+<span class="fc" id="L73">        PickupPoint point = pickupPointMapper.selectById(id);</span>
+<span class="fc bfc" id="L74" title="All 2 branches covered.">        if (point == null) {</span>
+<span class="fc" id="L75">            throw new BusinessException(ResultCode.PICKUP_POINT_NOT_FOUND);</span>
+        }
+<span class="fc" id="L77">        return point;</span>
+    }
+
+    private void assertAdminOrHead(String role) {
+<span class="fc bfc" id="L81" title="All 4 branches covered.">        if (!Constants.ROLE_ADMIN.equals(role) &amp;&amp; !Constants.ROLE_HEAD.equals(role)) {</span>
+<span class="fc" id="L82">            throw new BusinessException(ResultCode.FORBIDDEN, &quot;仅管理员或团长可管理自提点&quot;);</span>
+        }
+<span class="fc" id="L84">    }</span>
+
+    private PickupPoint build(PickupPointDTO dto) {
+<span class="fc" id="L87">        PickupPoint point = new PickupPoint();</span>
+<span class="fc" id="L88">        point.setName(dto.getName().trim());</span>
+<span class="fc" id="L89">        point.setAddress(dto.getAddress().trim());</span>
+<span class="pc bpc" id="L90" title="1 of 2 branches missed.">        point.setManager(dto.getManager() == null ? &quot;&quot; : dto.getManager());</span>
+<span class="pc bpc" id="L91" title="1 of 2 branches missed.">        point.setPhone(dto.getPhone() == null ? &quot;&quot; : dto.getPhone());</span>
+<span class="fc" id="L92">        return point;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

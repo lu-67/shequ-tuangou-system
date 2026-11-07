@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PaymentController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">community-groupbuy</a> &gt; <a href="index.source.html" class="el_package">com.community.groupbuy.controller</a> &gt; <span class="el_source">PaymentController.java</span></div><h1>PaymentController.java</h1><pre class="source lang-java linenums">package com.community.groupbuy.controller;
+
+import com.community.groupbuy.common.PaySignUtils;
+import com.community.groupbuy.common.Result;
+import com.community.groupbuy.common.SecurityUtils;
+import com.community.groupbuy.dto.CreatePaymentDTO;
+import com.community.groupbuy.dto.PageResult;
+import com.community.groupbuy.dto.PaymentCallbackDTO;
+import com.community.groupbuy.dto.PaymentQueryDTO;
+import com.community.groupbuy.entity.GroupOrder;
+import com.community.groupbuy.entity.Payment;
+import com.community.groupbuy.service.OrderService;
+import com.community.groupbuy.service.PaymentService;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.math.BigDecimal;
+
+/**
+ * M4 支付与成团（支付幂等 / 回调防重入账 / 退款回补库存）
+ */
+@RestController
+@RequestMapping(&quot;/api/payments&quot;)
+<span class="fc" id="L31">@RequiredArgsConstructor</span>
+public class PaymentController {
+
+    private final PaymentService paymentService;
+    private final OrderService orderService;
+
+    @Value(&quot;${app.pay.secret:community-groupbuy-pay-dev-secret-2026}&quot;)
+    private String paySecret;
+
+    /** 发起支付（幂等：同一订单重复提交返回同一笔支付单） */
+    @PostMapping
+    public Result&lt;Payment&gt; create(@Valid @RequestBody CreatePaymentDTO dto) {
+<span class="fc" id="L43">        Long userId = SecurityUtils.getUserId();</span>
+<span class="fc" id="L44">        String role = SecurityUtils.getRole();</span>
+<span class="fc" id="L45">        return Result.success(&quot;支付单已创建&quot;, paymentService.createPayment(dto.getOrderId(), dto.getChannel(), userId, role));</span>
+    }
+
+    /**
+     * 快速支付（演示模式）：一键完成「创建支付单 + 自动回调入账」。
+     * 居民端「我的订单 → 立即支付」按钮直接调用此接口。
+     * 幂等：重复调用自动返回已支付状态，不会重复入账。
+     */
+    @PostMapping(&quot;/pay/{orderId}&quot;)
+    public Result&lt;Payment&gt; quickPay(@PathVariable Long orderId) {
+<span class="nc" id="L55">        Long userId = SecurityUtils.getUserId();</span>
+<span class="nc" id="L56">        String role = SecurityUtils.getRole();</span>
+
+        // 1. 创建/获取支付单（幂等）
+<span class="nc" id="L59">        Payment payment = paymentService.createPayment(orderId, &quot;WECHAT&quot;, userId, role);</span>
+
+        // 2. 幂等：支付单已成功 → 直接返回，不重复入账
+<span class="nc bnc" id="L62" title="All 2 branches missed.">        if (&quot;SUCCESS&quot;.equals(payment.getStatus())) {</span>
+<span class="nc" id="L63">            return Result.success(&quot;已支付&quot;, payment);</span>
+        }
+
+        // 3. 构造回调 DTO + 合法签名，自动走入账流程
+<span class="nc" id="L67">        GroupOrder order = orderService.getOrder(orderId);</span>
+<span class="nc" id="L68">        PaymentCallbackDTO cb = new PaymentCallbackDTO();</span>
+<span class="nc" id="L69">        cb.setPayNo(payment.getPayNo());</span>
+<span class="nc" id="L70">        cb.setOrderNo(order.getOrderNo());</span>
+<span class="nc" id="L71">        cb.setAmount(order.getAmount());</span>
+<span class="nc" id="L72">        cb.setChannel(&quot;WECHAT&quot;);</span>
+<span class="nc" id="L73">        cb.setSign(PaySignUtils.sign(paySecret, payment.getPayNo(), order.getOrderNo(), order.getAmount().toPlainString()));</span>
+
+<span class="nc" id="L75">        paymentService.handleCallback(cb);</span>
+
+        // 4. 返回最新支付单
+<span class="nc" id="L78">        return Result.success(&quot;支付成功&quot;, paymentService.getPayment(payment.getId()));</span>
+    }
+
+    /** 支付回调（验签 + 幂等，重放不重复入账） */
+    @PostMapping(&quot;/callback&quot;)
+    public Result&lt;Boolean&gt; callback(@Valid @RequestBody PaymentCallbackDTO dto) {
+<span class="fc" id="L84">        return Result.success(&quot;回调处理成功&quot;, paymentService.handleCallback(dto));</span>
+    }
+
+    /** 退款：订单置为 CANCELLED 并回补活动库存 */
+    @PostMapping(&quot;/{id}/refund&quot;)
+    public Result&lt;Void&gt; refund(@PathVariable Long id) {
+<span class="fc" id="L90">        Long userId = SecurityUtils.getUserId();</span>
+<span class="fc" id="L91">        String role = SecurityUtils.getRole();</span>
+<span class="fc" id="L92">        paymentService.refund(id, userId, role);</span>
+<span class="fc" id="L93">        return Result.success(&quot;退款成功&quot;);</span>
+    }
+
+    /** 支付单详情 */
+    @GetMapping(&quot;/{id}&quot;)
+    public Result&lt;Payment&gt; get(@PathVariable Long id) {
+<span class="nc" id="L99">        return Result.success(paymentService.getPayment(id));</span>
+    }
+
+    /** 支付记录列表（动态条件 + 分页） */
+    @GetMapping
+    public Result&lt;PageResult&lt;Payment&gt;&gt; list(PaymentQueryDTO query) {
+<span class="fc" id="L105">        return Result.success(PageResult.of(paymentService.count(query), query.getPageNum(), query.getPageSize(),</span>
+<span class="fc" id="L106">                paymentService.list(query)));</span>
+    }
+
+    /**
+     * 演示用：生成回调签名，方便在 Knife4j 里自测 /api/payments/callback
+     * 字段顺序 payNo | orderNo | amount，生产环境应移除该接口
+     */
+    @GetMapping(&quot;/sign-demo&quot;)
+    public Result&lt;String&gt; signDemo(String payNo, String orderNo, String amount) {
+<span class="fc" id="L115">        return Result.success(&quot;演示签名&quot;, paymentService.demoSign(payNo, orderNo, amount));</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

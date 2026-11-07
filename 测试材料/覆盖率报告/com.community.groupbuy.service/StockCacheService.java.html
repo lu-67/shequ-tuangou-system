@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>StockCacheService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">community-groupbuy</a> &gt; <a href="index.source.html" class="el_package">com.community.groupbuy.service</a> &gt; <span class="el_source">StockCacheService.java</span></div><h1>StockCacheService.java</h1><pre class="source lang-java linenums">package com.community.groupbuy.service;
+
+import com.community.groupbuy.common.Constants;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.stereotype.Service;
+
+/**
+ * M7 库存预热（C 同学）
+ *
+ * M3 下单链路（OrderService）只有在 stockKey 存在时才做 Redis 预扣：
+ *   hasKey(stockKey) → increment(stockKey, -qty)
+ * 所以活动进入 ONGOING 时必须先把 DB 的 stock 写入该 key，否则预扣形同虚设。
+ *
+ * 预热点（由 ActivityService 调用，各一行）：
+ * - 创建活动（初始即 ONGOING 时）
+ * - 状态流转到 ONGOING
+ * - 状态流转到 SUCCESS / FAILED，或成团判定成功 → 删除 key（活动已结束，无需预扣）
+ *
+ * 全部 fail-open：Redis 不可用只打日志，不影响活动创建/状态流转主流程。
+ */
+<span class="fc" id="L23">@Slf4j</span>
+@Service
+<span class="fc" id="L25">@RequiredArgsConstructor</span>
+public class StockCacheService {
+
+    private final StringRedisTemplate stringRedisTemplate;
+
+    /** 预热：把活动当前库存写入 Redis（与 OrderService 的 key 完全一致） */
+    public void preheat(Long activityId, Integer stock) {
+<span class="pc bpc" id="L32" title="2 of 4 branches missed.">        if (activityId == null || stock == null) {</span>
+<span class="nc" id="L33">            return;</span>
+        }
+<span class="fc" id="L35">        String key = Constants.REDIS_STOCK_PREFIX + activityId;</span>
+        try {
+<span class="fc" id="L37">            stringRedisTemplate.opsForValue().set(key, String.valueOf(stock));</span>
+<span class="fc" id="L38">            log.info(&quot;库存预热成功: activityId={}, stock={}, key={}&quot;, activityId, stock, key);</span>
+<span class="fc" id="L39">        } catch (Exception e) {</span>
+<span class="fc" id="L40">            log.warn(&quot;库存预热失败（fail-open，不影响主流程）activityId={}: {}&quot;, activityId, e.getMessage());</span>
+<span class="fc" id="L41">        }</span>
+<span class="fc" id="L42">    }</span>
+
+    /** 清除预热：活动结束（成团/失败）后调用 */
+    public void evict(Long activityId) {
+<span class="pc bpc" id="L46" title="1 of 2 branches missed.">        if (activityId == null) {</span>
+<span class="nc" id="L47">            return;</span>
+        }
+<span class="fc" id="L49">        String key = Constants.REDIS_STOCK_PREFIX + activityId;</span>
+        try {
+<span class="fc" id="L51">            stringRedisTemplate.delete(key);</span>
+<span class="fc" id="L52">            log.info(&quot;库存缓存已清除: activityId={}, key={}&quot;, activityId, key);</span>
+<span class="nc" id="L53">        } catch (Exception e) {</span>
+<span class="nc" id="L54">            log.warn(&quot;库存缓存清除失败（fail-open）activityId={}: {}&quot;, activityId, e.getMessage());</span>
+<span class="fc" id="L55">        }</span>
+<span class="fc" id="L56">    }</span>
+
+    /** 读取当前缓存库存，未预热或 Redis 不可用返回 null */
+    public Integer getCachedStock(Long activityId) {
+        try {
+<span class="fc" id="L61">            String value = stringRedisTemplate.opsForValue().get(Constants.REDIS_STOCK_PREFIX + activityId);</span>
+<span class="fc bfc" id="L62" title="All 2 branches covered.">            return value == null ? null : Integer.valueOf(value);</span>
+<span class="nc" id="L63">        } catch (Exception e) {</span>
+<span class="nc" id="L64">            log.warn(&quot;读取库存缓存失败: activityId={}: {}&quot;, activityId, e.getMessage());</span>
+<span class="nc" id="L65">            return null;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ResultCode.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">community-groupbuy</a> &gt; <a href="index.source.html" class="el_package">com.community.groupbuy.common</a> &gt; <span class="el_source">ResultCode.java</span></div><h1>ResultCode.java</h1><pre class="source lang-java linenums">package com.community.groupbuy.common;
+
+import lombok.Getter;
+
+/**
+ * 响应码常量（魔法值统一收敛于此）
+ */
+<span class="fc" id="L8">@Getter</span>
+public enum ResultCode {
+
+<span class="fc" id="L11">    SUCCESS(200, &quot;操作成功&quot;),</span>
+<span class="fc" id="L12">    PARAM_ERROR(400, &quot;参数错误&quot;),</span>
+<span class="fc" id="L13">    UNAUTHORIZED(401, &quot;未登录或登录已过期&quot;),</span>
+<span class="fc" id="L14">    FORBIDDEN(403, &quot;无权限访问&quot;),</span>
+<span class="fc" id="L15">    NOT_FOUND(404, &quot;资源不存在&quot;),</span>
+<span class="fc" id="L16">    BUSINESS_ERROR(500, &quot;业务处理失败&quot;),</span>
+<span class="fc" id="L17">    SYSTEM_ERROR(500, &quot;系统异常&quot;),</span>
+
+    // 业务细分
+<span class="fc" id="L20">    USER_EXISTS(1001, &quot;用户名已存在&quot;),</span>
+<span class="fc" id="L21">    USER_NOT_FOUND(1002, &quot;用户不存在&quot;),</span>
+<span class="fc" id="L22">    PASSWORD_ERROR(1003, &quot;账号或密码错误&quot;),</span>
+    // M1 商品段（C 同学）：追加在 1000 段末尾，不动上面已有行号
+<span class="fc" id="L24">    PRODUCT_NOT_FOUND(1101, &quot;商品不存在&quot;),</span>
+<span class="fc" id="L25">    PRODUCT_PRICE_ERROR(1102, &quot;团购价不能高于原价&quot;),</span>
+<span class="fc" id="L26">    PRODUCT_STATUS_ERROR(1103, &quot;商品状态非法&quot;),</span>
+<span class="fc" id="L27">    PRODUCT_REFERENCED(1104, &quot;商品已被团购活动引用，不可删除&quot;),</span>
+<span class="fc" id="L28">    ACTIVITY_NOT_FOUND(2001, &quot;团购活动不存在&quot;),</span>
+<span class="fc" id="L29">    ACTIVITY_NOT_ONGOING(2002, &quot;活动未在进行中&quot;),</span>
+<span class="fc" id="L30">    STOCK_NOT_ENOUGH(2003, &quot;库存不足/已抢光&quot;),</span>
+<span class="fc" id="L31">    ACTIVITY_STATUS_ERROR(2004, &quot;活动状态流转非法&quot;),</span>
+<span class="fc" id="L32">    ORDER_NOT_FOUND(3001, &quot;订单不存在&quot;),</span>
+<span class="fc" id="L33">    ORDER_STATUS_ERROR(3002, &quot;订单状态异常&quot;),</span>
+<span class="fc" id="L34">    PAY_FAILED(3003, &quot;支付失败&quot;),</span>
+<span class="fc" id="L35">    PAY_SIGN_ERROR(3004, &quot;支付回调验签失败&quot;),</span>
+<span class="fc" id="L36">    PAY_AMOUNT_MISMATCH(3005, &quot;支付金额与订单金额不一致&quot;),</span>
+<span class="fc" id="L37">    VERIFY_CODE_INVALID(4001, &quot;核销码无效&quot;),</span>
+<span class="fc" id="L38">    VERIFY_ALREADY_DONE(4002, &quot;该订单已核销，不可重复核销&quot;),</span>
+    // M5 自提点段（C 同学）：追加在 4000 段末尾
+<span class="fc" id="L40">    PICKUP_POINT_NOT_FOUND(4101, &quot;自提点不存在&quot;),</span>
+<span class="fc" id="L41">    PICKUP_POINT_REFERENCED(4102, &quot;自提点已有核销记录，不可删除&quot;),</span>
+<span class="fc" id="L42">    RATE_LIMIT(5001, &quot;请求过于频繁，请稍后再试&quot;),</span>
+    ;
+
+<span class="fc" id="L45">    private final int code;</span>
+<span class="fc" id="L46">    private final String message;</span>
+
+<span class="fc" id="L48">    ResultCode(int code, String message) {</span>
+<span class="fc" id="L49">        this.code = code;</span>
+<span class="fc" id="L50">        this.message = message;</span>
+<span class="fc" id="L51">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>StatsServiceImpl.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">community-groupbuy</a> &gt; <a href="index.source.html" class="el_package">com.community.groupbuy.service</a> &gt; <span class="el_source">StatsServiceImpl.java</span></div><h1>StatsServiceImpl.java</h1><pre class="source lang-java linenums">package com.community.groupbuy.service;
+
+import com.alibaba.excel.EasyExcel;
+import com.community.groupbuy.mapper.StatsMapper;
+import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import java.io.IOException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+
+@Service
+<span class="fc" id="L17">public class StatsServiceImpl implements StatsService {</span>
+
+    @Autowired
+    private StatsMapper statsMapper;
+
+    @Override
+    public Map&lt;String, Object&gt; getOverviewStats() {
+<span class="fc" id="L24">        return statsMapper.getOverviewStats(null);</span>
+    }
+
+    @Override
+    public List&lt;Map&lt;String, Object&gt;&gt; listOrders() {
+<span class="fc" id="L29">        List&lt;Map&lt;String, Object&gt;&gt; list = statsMapper.getOrderListForExport(null);</span>
+<span class="pc bpc" id="L30" title="1 of 2 branches missed.">        return list == null ? new ArrayList&lt;&gt;() : list;</span>
+    }
+
+<span class="fc" id="L33">    private static final Map&lt;String, String&gt; STATUS_MAP = Map.of(</span>
+            &quot;UNPAID&quot;, &quot;待支付&quot;,
+            &quot;PAID&quot;, &quot;已支付&quot;,
+            &quot;CANCELLED&quot;, &quot;已取消&quot;,
+            &quot;PICKED&quot;, &quot;已核销&quot;
+    );
+
+    @Override
+    public void exportOrders(HttpServletResponse response) {
+        try {
+<span class="fc" id="L43">            response.setContentType(&quot;application/vnd.openxmlformats-officedocument.spreadsheetml.sheet&quot;);</span>
+<span class="fc" id="L44">            response.setCharacterEncoding(&quot;utf-8&quot;);</span>
+<span class="fc" id="L45">            String fileName = URLEncoder.encode(&quot;社区团购订单数据&quot;, StandardCharsets.UTF_8).replaceAll(&quot;\\+&quot;, &quot;%20&quot;);</span>
+<span class="fc" id="L46">            response.setHeader(&quot;Content-disposition&quot;, &quot;attachment;filename*=utf-8''&quot; + fileName + &quot;.xlsx&quot;);</span>
+
+<span class="fc" id="L48">            List&lt;Map&lt;String, Object&gt;&gt; orderList = statsMapper.getOrderListForExport(null);</span>
+<span class="fc bfc" id="L49" title="All 2 branches covered.">            if (orderList == null) orderList = new ArrayList&lt;&gt;();</span>
+
+            // 表头（与图片中 Excel 设计一致）
+<span class="fc" id="L52">            List&lt;List&lt;String&gt;&gt; head = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L53">            head.add(List.of(&quot;订单号&quot;));</span>
+<span class="fc" id="L54">            head.add(List.of(&quot;下单用户ID&quot;));</span>
+<span class="fc" id="L55">            head.add(List.of(&quot;支付金额&quot;));</span>
+<span class="fc" id="L56">            head.add(List.of(&quot;订单状态&quot;));</span>
+<span class="fc" id="L57">            head.add(List.of(&quot;下单时间&quot;));</span>
+
+            // 将 Map 列表转换为 EasyExcel 需要的二维数组格式
+<span class="fc" id="L60">            List&lt;List&lt;Object&gt;&gt; dataList = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L61" title="All 2 branches covered.">            for (Map&lt;String, Object&gt; row : orderList) {</span>
+<span class="fc" id="L62">                List&lt;Object&gt; rowData = new ArrayList&lt;&gt;();</span>
+                // 1. 订单号
+<span class="fc" id="L64">                rowData.add(row.get(&quot;orderNo&quot;));</span>
+                // 2. 下单用户ID
+<span class="fc" id="L66">                rowData.add(row.get(&quot;username&quot;));</span>
+                // 3. 支付金额
+<span class="fc" id="L68">                rowData.add(row.get(&quot;amount&quot;));</span>
+                // 4. 订单状态：转换为中文
+<span class="fc" id="L70">                String status = (String) row.get(&quot;status&quot;);</span>
+<span class="fc" id="L71">                rowData.add(STATUS_MAP.getOrDefault(status, status));</span>
+                // 5. 下单时间
+<span class="fc" id="L73">                rowData.add(row.get(&quot;createTime&quot;));</span>
+<span class="fc" id="L74">                dataList.add(rowData);</span>
+<span class="fc" id="L75">            }</span>
+
+<span class="fc" id="L77">            EasyExcel.write(response.getOutputStream())</span>
+<span class="fc" id="L78">                    .head(head)</span>
+<span class="fc" id="L79">                    .sheet(&quot;订单数据&quot;)</span>
+<span class="fc" id="L80">                    .doWrite(dataList);</span>
+<span class="fc" id="L81">        } catch (IOException e) {</span>
+<span class="fc" id="L82">            throw new RuntimeException(&quot;导出Excel失败&quot;, e);</span>
+<span class="fc" id="L83">        }</span>
+<span class="fc" id="L84">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

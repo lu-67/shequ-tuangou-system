@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Result.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">community-groupbuy</a> &gt; <a href="index.source.html" class="el_package">com.community.groupbuy.common</a> &gt; <span class="el_source">Result.java</span></div><h1>Result.java</h1><pre class="source lang-java linenums">package com.community.groupbuy.common;
+
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+import java.io.Serializable;
+
+/**
+ * 统一响应结构: { code, message, data }
+ */
+@Getter
+<span class="nc" id="L14">@Setter</span>
+<span class="nc" id="L15">@NoArgsConstructor</span>
+<span class="fc" id="L16">@AllArgsConstructor</span>
+public class Result&lt;T&gt; implements Serializable {
+
+    private static final long serialVersionUID = 1L;
+
+    /** 状态码: 200 成功, 其余为业务/错误码 */
+<span class="fc" id="L22">    private int code;</span>
+    /** 提示信息 */
+<span class="fc" id="L24">    private String message;</span>
+    /** 业务数据 */
+<span class="fc" id="L26">    private T data;</span>
+
+    public static &lt;T&gt; Result&lt;T&gt; success(T data) {
+<span class="fc" id="L29">        return new Result&lt;&gt;(ResultCode.SUCCESS.getCode(), ResultCode.SUCCESS.getMessage(), data);</span>
+    }
+
+    public static &lt;T&gt; Result&lt;T&gt; success(String message, T data) {
+<span class="fc" id="L33">        return new Result&lt;&gt;(ResultCode.SUCCESS.getCode(), message, data);</span>
+    }
+
+    public static Result&lt;Void&gt; success() {
+<span class="nc" id="L37">        return new Result&lt;&gt;(ResultCode.SUCCESS.getCode(), ResultCode.SUCCESS.getMessage(), null);</span>
+    }
+
+    /** 仅带提示信息、无业务数据的成功响应 */
+    public static Result&lt;Void&gt; success(String message) {
+<span class="fc" id="L42">        return new Result&lt;&gt;(ResultCode.SUCCESS.getCode(), message, null);</span>
+    }
+
+    public static &lt;T&gt; Result&lt;T&gt; error(int code, String message) {
+<span class="fc" id="L46">        return new Result&lt;&gt;(code, message, null);</span>
+    }
+
+    public static &lt;T&gt; Result&lt;T&gt; error(String message) {
+<span class="nc" id="L50">        return new Result&lt;&gt;(ResultCode.BUSINESS_ERROR.getCode(), message, null);</span>
+    }
+
+    public static &lt;T&gt; Result&lt;T&gt; error(ResultCode resultCode) {
+<span class="fc" id="L54">        return new Result&lt;&gt;(resultCode.getCode(), resultCode.getMessage(), null);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>

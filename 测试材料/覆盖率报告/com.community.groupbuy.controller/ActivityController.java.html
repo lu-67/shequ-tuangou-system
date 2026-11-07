@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="zh"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ActivityController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">community-groupbuy</a> &gt; <a href="index.source.html" class="el_package">com.community.groupbuy.controller</a> &gt; <span class="el_source">ActivityController.java</span></div><h1>ActivityController.java</h1><pre class="source lang-java linenums">package com.community.groupbuy.controller;
+
+import com.community.groupbuy.common.Result;
+import com.community.groupbuy.common.SecurityUtils;
+import com.community.groupbuy.dto.ActivityQueryDTO;
+import com.community.groupbuy.dto.CreateActivityDTO;
+import com.community.groupbuy.dto.PageResult;
+import com.community.groupbuy.entity.GroupActivity;
+import com.community.groupbuy.service.ActivityService;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
+
+/**
+ * M2 开团活动接口
+ */
+@RestController
+@RequestMapping(&quot;/api/activities&quot;)
+<span class="fc" id="L28">@RequiredArgsConstructor</span>
+public class ActivityController {
+
+    private final ActivityService activityService;
+
+    /** 创建开团活动（团长 / 管理员），新建为 PENDING */
+    @PostMapping
+    public Result&lt;Long&gt; create(@Valid @RequestBody CreateActivityDTO dto) {
+<span class="fc" id="L36">        Long operatorId = SecurityUtils.getUserId();</span>
+<span class="fc" id="L37">        String role = SecurityUtils.getRole();</span>
+<span class="fc" id="L38">        return Result.success(activityService.createActivity(dto, operatorId, role));</span>
+    }
+
+    /** 活动状态流转：PENDING -&gt; ONGOING -&gt; SUCCESS / FAILED */
+    @PutMapping(&quot;/{id}/status&quot;)
+    public Result&lt;Void&gt; updateStatus(@PathVariable Long id, @RequestParam String status) {
+<span class="nc" id="L44">        activityService.updateStatus(id, status, SecurityUtils.getRole());</span>
+<span class="nc" id="L45">        return Result.success(&quot;活动状态已更新&quot;);</span>
+    }
+
+    /** 分页 + 动态条件查询（管理后台） */
+    @GetMapping
+    public Result&lt;PageResult&lt;GroupActivity&gt;&gt; page(ActivityQueryDTO query) {
+<span class="fc" id="L51">        return Result.success(activityService.page(query));</span>
+    }
+
+    /** 进行中活动列表（居民端首页） */
+    @GetMapping(&quot;/ongoing&quot;)
+    public Result&lt;List&lt;GroupActivity&gt;&gt; ongoing() {
+<span class="fc" id="L57">        return Result.success(activityService.listOngoing());</span>
+    }
+
+    /** 团长/管理员：查询我创建的活动（全部状态），用于前台「我的开团」页面 */
+    @GetMapping(&quot;/mine&quot;)
+    public Result&lt;List&lt;GroupActivity&gt;&gt; mine() {
+<span class="nc" id="L63">        Long userId = SecurityUtils.getUserId();</span>
+<span class="nc" id="L64">        String role = SecurityUtils.getRole();</span>
+<span class="nc" id="L65">        return Result.success(activityService.listMyActivities(userId, role));</span>
+    }
+
+    @GetMapping(&quot;/{id}&quot;)
+    public Result&lt;GroupActivity&gt; get(@PathVariable Long id) {
+<span class="nc" id="L70">        return Result.success(activityService.getActivity(id));</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.11.202310140853</span></div></body></html>
