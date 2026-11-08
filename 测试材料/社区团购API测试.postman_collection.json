@@ -5,9 +5,18 @@
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
-    { "key": "base_url", "value": "http://127.0.0.1:8080" },
-    { "key": "token", "value": "" },
-    { "key": "resident_token", "value": "" }
+    {
+      "key": "base_url",
+      "value": "http://127.0.0.1:8080"
+    },
+    {
+      "key": "token",
+      "value": ""
+    },
+    {
+      "key": "resident_token",
+      "value": ""
+    }
   ],
   "item": [
     {
@@ -17,20 +26,33 @@
           "name": "登录(管理员) → 自动存 token",
           "request": {
             "method": "POST",
-            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "url": "{{base_url}}/api/auth/login",
-            "body": { "mode": "raw", "raw": "{\"username\":\"admin\",\"password\":\"123456\"}" },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"username\":\"admin\",\"password\":\"123456\"}"
+            },
             "event": [
-              { "listen": "test", "script": { "exec": [
-                "var json = pm.response.json();",
-                "if (json.data && json.data.token) {",
-                "    pm.environment.set('token', json.data.token);",
-                "    pm.environment.set('role', json.data.role);",
-                "    console.log('已保存管理员 token');",
-                "} else {",
-                "    console.log('登录失败: ' + json.message);",
-                "}"
-              ] } }
+              {
+                "listen": "test",
+                "script": {
+                  "exec": [
+                    "var json = pm.response.json();",
+                    "if (json.data && json.data.token) {",
+                    "    pm.environment.set('token', json.data.token);",
+                    "    pm.environment.set('role', json.data.role);",
+                    "    console.log('已保存管理员 token');",
+                    "} else {",
+                    "    console.log('登录失败: ' + json.message);",
+                    "}"
+                  ]
+                }
+              }
             ]
           }
         },
@@ -38,14 +60,27 @@
           "name": "登录(居民 user05) → 自动存 resident_token",
           "request": {
             "method": "POST",
-            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "url": "{{base_url}}/api/auth/login",
-            "body": { "mode": "raw", "raw": "{\"username\":\"user05\",\"password\":\"123456\"}" },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"username\":\"user05\",\"password\":\"123456\"}"
+            },
             "event": [
-              { "listen": "test", "script": { "exec": [
-                "var json = pm.response.json();",
-                "if (json.data && json.data.token) { pm.environment.set('resident_token', json.data.token); }"
-              ] } }
+              {
+                "listen": "test",
+                "script": {
+                  "exec": [
+                    "var json = pm.response.json();",
+                    "if (json.data && json.data.token) { pm.environment.set('resident_token', json.data.token); }"
+                  ]
+                }
+              }
             ]
           }
         },
@@ -53,9 +88,17 @@
           "name": "注册新用户",
           "request": {
             "method": "POST",
-            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "url": "{{base_url}}/api/auth/register",
-            "body": { "mode": "raw", "raw": "{\"username\":\"testuser1\",\"password\":\"123456\",\"role\":\"RESIDENT\"}" }
+            "body": {
+              "mode": "raw",
+              "raw": "{\"username\":\"testuser1\",\"password\":\"123456\",\"role\":\"RESIDENT\"}"
+            }
           }
         },
         {
@@ -70,54 +113,364 @@
     {
       "name": "M1 商品管理（成员C）",
       "item": [
-        { "name": "商品列表(管理端,需token)", "request": { "method": "GET", "header": [ { "key": "Authorization", "value": "Bearer {{token}}" } ], "url": "{{base_url}}/api/products" } },
-        { "name": "商品列表(居民公开,免登录)", "request": { "method": "GET", "url": "{{base_url}}/api/products/list" } },
-        { "name": "商品详情", "request": { "method": "GET", "header": [ { "key": "Authorization", "value": "Bearer {{token}}" } ], "url": "{{base_url}}/api/products/1" } },
-        { "name": "新建商品(ADMIN)", "request": { "method": "POST", "header": [ { "key": "Content-Type", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{token}}" } ], "url": "{{base_url}}/api/products", "body": { "mode": "raw", "raw": "{\"name\":\"测试商品\",\"price\":9.9,\"stock\":100,\"category\":\"蔬菜\"}" } } }
+        {
+          "name": "商品列表(管理端,需token)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": "{{base_url}}/api/products"
+          }
+        },
+        {
+          "name": "商品列表(居民公开,免登录)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/products/list"
+          }
+        },
+        {
+          "name": "商品详情",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": "{{base_url}}/api/products/1"
+          }
+        },
+        {
+          "name": "新建商品(ADMIN)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": "{{base_url}}/api/products",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"name\":\"测试商品\",\"price\":9.9,\"stock\":100,\"category\":\"蔬菜\"}"
+            }
+          }
+        }
       ]
     },
     {
       "name": "M2 开团活动（成员B）",
       "item": [
-        { "name": "活动列表(管理端)", "request": { "method": "GET", "header": [ { "key": "Authorization", "value": "Bearer {{token}}" } ], "url": "{{base_url}}/api/activities" } },
-        { "name": "进行中活动(居民公开)", "request": { "method": "GET", "url": "{{base_url}}/api/activities/ongoing" } },
-        { "name": "活动详情", "request": { "method": "GET", "header": [ { "key": "Authorization", "value": "Bearer {{token}}" } ], "url": "{{base_url}}/api/activities/1" } },
-        { "name": "新建活动(ADMIN/HEAD)", "request": { "method": "POST", "header": [ { "key": "Content-Type", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{token}}" } ], "url": "{{base_url}}/api/activities", "body": { "mode": "raw", "raw": "{\"title\":\"周末特惠\",\"productId\":1,\"totalStock\":1000,\"perLimit\":5,\"price\":19.9,\"startTime\":\"2026-11-01 00:00:00\",\"endTime\":\"2026-11-07 23:59:59\"}" } } },
-        { "name": "更新活动状态(成团/失败)", "request": { "method": "PUT", "header": [ { "key": "Content-Type", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{token}}" } ], "url": "{{base_url}}/api/activities/1/status", "body": { "mode": "raw", "raw": "{\"status\":\"GROUPED\"}" } } }
+        {
+          "name": "活动列表(管理端)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": "{{base_url}}/api/activities"
+          }
+        },
+        {
+          "name": "进行中活动(居民公开)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/activities/ongoing"
+          }
+        },
+        {
+          "name": "活动详情",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": "{{base_url}}/api/activities/1"
+          }
+        },
+        {
+          "name": "新建活动(ADMIN/HEAD)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": "{{base_url}}/api/activities",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"title\":\"周末特惠\",\"productId\":1,\"totalStock\":1000,\"perLimit\":5,\"price\":19.9,\"startTime\":\"2026-11-01 00:00:00\",\"endTime\":\"2026-11-07 23:59:59\"}"
+            }
+          }
+        },
+        {
+          "name": "更新活动状态(成团/失败)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": "{{base_url}}/api/activities/1/status",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"status\":\"GROUPED\"}"
+            }
+          }
+        }
       ]
     },
     {
       "name": "M3 参团下单（组长A）",
       "item": [
-        { "name": "我的订单(RESIDENT)", "request": { "method": "GET", "header": [ { "key": "Authorization", "value": "Bearer {{resident_token}}" } ], "url": "{{base_url}}/api/orders/my" } },
-        { "name": "下单(RESIDENT)", "request": { "method": "POST", "header": [ { "key": "Content-Type", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{resident_token}}" } ], "url": "{{base_url}}/api/orders", "body": { "mode": "raw", "raw": "{\"activityId\":1,\"quantity\":1,\"pickupPointId\":1}" } } },
-        { "name": "订单详情", "request": { "method": "GET", "header": [ { "key": "Authorization", "value": "Bearer {{resident_token}}" } ], "url": "{{base_url}}/api/orders/1" } }
+        {
+          "name": "我的订单(RESIDENT)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{resident_token}}"
+              }
+            ],
+            "url": "{{base_url}}/api/orders/my"
+          }
+        },
+        {
+          "name": "下单(RESIDENT)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{resident_token}}"
+              }
+            ],
+            "url": "{{base_url}}/api/orders",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"activityId\":1,\"quantity\":1,\"pickupPointId\":1}"
+            }
+          }
+        },
+        {
+          "name": "订单详情",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{resident_token}}"
+              }
+            ],
+            "url": "{{base_url}}/api/orders/1"
+          }
+        }
       ]
     },
     {
       "name": "M4 支付与成团（成员B）",
       "item": [
-        { "name": "发起支付", "request": { "method": "POST", "header": [ { "key": "Authorization", "value": "Bearer {{resident_token}}" } ], "url": "{{base_url}}/api/payments/pay/1" } },
-        { "name": "支付回调(幂等演示)", "request": { "method": "POST", "header": [ { "key": "Content-Type", "value": "application/json" } ], "url": "{{base_url}}/api/payments/callback", "body": { "mode": "raw", "raw": "{\"orderId\":1,\"tradeNo\":\"TN20261101001\",\"status\":\"SUCCESS\"}" } } },
-        { "name": "申请退款", "request": { "method": "POST", "header": [ { "key": "Authorization", "value": "Bearer {{resident_token}}" } ], "url": "{{base_url}}/api/payments/1/refund" } },
-        { "name": "支付详情", "request": { "method": "GET", "header": [ { "key": "Authorization", "value": "Bearer {{token}}" } ], "url": "{{base_url}}/api/payments/1" } }
+        {
+          "name": "发起支付",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{resident_token}}"
+              }
+            ],
+            "url": "{{base_url}}/api/payments/pay/1"
+          }
+        },
+        {
+          "name": "支付回调(幂等演示)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/api/payments/callback",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"payNo\":\"PAY00000001\",\"orderNo\":\"NO2026000001\",\"amount\":79.8,\"channel\":\"WECHAT\",\"sign\":\"4399925015c48a01fe511c5c387aa1d27c2f019d654350d85b1ca736d0eaa3d0\"}"
+            }
+          }
+        },
+        {
+          "name": "申请退款",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{resident_token}}"
+              }
+            ],
+            "url": "{{base_url}}/api/payments/1/refund"
+          }
+        },
+        {
+          "name": "支付详情",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": "{{base_url}}/api/payments/1"
+          }
+        }
       ]
     },
     {
       "name": "M5 自提核销（成员C）",
       "item": [
-        { "name": "自提点列表(居民公开)", "request": { "method": "GET", "url": "{{base_url}}/api/pickup/points" } },
-        { "name": "核销码核销(HEAD/ADMIN)", "request": { "method": "POST", "header": [ { "key": "Content-Type", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{token}}" } ], "url": "{{base_url}}/api/pickup/verify", "body": { "mode": "raw", "raw": "{\"code\":\"VERIFY-0001\"}" } } },
-        { "name": "新建自提点(ADMIN)", "request": { "method": "POST", "header": [ { "key": "Content-Type", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{token}}" } ], "url": "{{base_url}}/api/pickup/points", "body": { "mode": "raw", "raw": "{\"name\":\"阳光小区自提点\",\"address\":\"xx路1号\",\"phone\":\"13800000000\"}" } } }
+        {
+          "name": "自提点列表(居民公开)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/pickup/points"
+          }
+        },
+        {
+          "name": "核销码核销(HEAD/ADMIN)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": "{{base_url}}/api/pickup/verify",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"verificationCode\":\"CG10000001\",\"pickupPointId\":1}"
+            }
+          }
+        },
+        {
+          "name": "新建自提点(ADMIN)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": "{{base_url}}/api/pickup/points",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"name\":\"阳光小区自提点\",\"address\":\"xx路1号\",\"phone\":\"13800000000\"}"
+            }
+          }
+        }
       ]
     },
     {
       "name": "M6 统计导出（成员D）",
       "item": [
-        { "name": "数据概览(ADMIN)", "request": { "method": "GET", "header": [ { "key": "Authorization", "value": "Bearer {{token}}" } ], "url": "{{base_url}}/api/stats/overview" } },
-        { "name": "订单列表(ADMIN)", "request": { "method": "GET", "header": [ { "key": "Authorization", "value": "Bearer {{token}}" } ], "url": "{{base_url}}/api/stats/orders" } },
-        { "name": "导出Excel(ADMIN,文件下载)", "request": { "method": "GET", "header": [ { "key": "Authorization", "value": "Bearer {{token}}" } ], "url": "{{base_url}}/api/stats/orders/export" } },
-        { "name": "越权演示:居民访问统计(预期403)", "request": { "method": "GET", "header": [ { "key": "Authorization", "value": "Bearer {{resident_token}}" } ], "url": "{{base_url}}/api/stats/overview" } }
+        {
+          "name": "数据概览(ADMIN)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": "{{base_url}}/api/stats/overview"
+          }
+        },
+        {
+          "name": "订单列表(ADMIN)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": "{{base_url}}/api/stats/orders"
+          }
+        },
+        {
+          "name": "导出Excel(ADMIN,文件下载)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": "{{base_url}}/api/stats/orders/export"
+          }
+        },
+        {
+          "name": "越权演示:居民访问统计(预期403)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{resident_token}}"
+              }
+            ],
+            "url": "{{base_url}}/api/stats/overview"
+          }
+        }
       ]
     }
   ]
