@@ -73,3 +73,25 @@ mvn clean test    # 133 个用例：10 个 Service 单测类 + 5 个 MockMvc 集
 
 - 本项目为《Java开发综合实训》课程大作业，代码在开发过程中使用 AI 辅助生成，均已人工审查、按项目约定整改。
 - 数据库连接、JWT 密钥等敏感配置走环境变量（见 `application-prod.yml`），仓库中不含任何真实密钥。
+
+## 已知问题与版本说明
+
+本节统一更正上文在开发过程中留下的阶段信息，最终以本节和 `community-groupbuy/README.md` 为准。
+
+- **测试用例数量**：上文「快速开始」「测试」两处写的 12 个、133 个用例是阶段性数字；最终 `mvn clean package` 执行 **159 个用例**（19 个测试类），JaCoCo 行覆盖率 85.9%、核心 Service 层 90.6%，明细见 `测试材料/覆盖率报告/` 与 `测试材料/测试用例汇总_规范版.xlsx`。
+- **数据表数量**：上文「数据库脚本」处的「9 张表」不准确，`db/schema.sql` 实际建 **7 张业务表**（sys_user、product、group_activity、group_order、pickup_point、payment、pickup_verification）。
+- **前端联调方式**：dev 环境两个前端通过各自 `.env.development` 的 `VITE_API_BASE` 直连 `http://127.0.0.1:8080/api`，后端 `SecurityConfig` 配了 CORS 白名单（仅放行 localhost / 127.0.0.1 的 5173、5174）；prod 不配该变量时回退同源 `/api`，由 Nginx 转发。上文「Vite 代理 `/api`、无需配 CORS」是初版方案，已不再使用。
+- **Redis 未启动**：分布式锁、库存预扣、令牌桶限流全部 fail-open 自动降级，核心流程不中断；但热点回源、限流等压测类用例需要 Redis 6379 才能测出真实结果。
+- **每次启动重置数据**：`spring.sql.init.mode=always`，启动时先 DROP 再重建表并重新灌入 `data.sql`，联调产生的数据重启即清空，演示过程中请勿重启后端。
+- **新环境一键运行**：MySQL 3307 上若还没有 `community_groupbuy` 库，连接串已带 `createDatabaseIfNotExist=true` 会自动建库；随后 `schema.sql` 与 `data.sql` 由 Spring 启动时自动执行，无需手工导入（也可先手工执行 `CREATE DATABASE community_groupbuy DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;`）。演示账号统一密码 `123456`：管理员 `admin`、团长 `head1`~`head3`、居民 `user05`~`user15`。
+- **协作与提交记录**：本组使用 GitHub（https://github.com/lu-67/shequ-tuangou-system）配合微信群协作，`main` + `feature/xxx` 分支、Pull Request 合并；提交记录导出见 `测试材料/提交记录/git-log.txt`，截图与代码归属说明见《项目报告书》第 6.1 节，微信讨论原始截图见 `协作材料/`。
+
+## 已知问题（运行时）
+
+| 现象 | 原因 | 处理方式 |
+| --- | --- | --- |
+| 登录页报「网络错误，请确认后端已启动」 | 本机系统代理接管了页面内 `/api` 请求 | dev 已改为直连 127.0.0.1:8080；若仍失败，把 127.0.0.1 加入代理绕过列表或临时关代理 |
+| 后端启动报端口 51696 被占用 | WorkBuddy 注入的 `SERVER__PORT` 被 Spring 读成 `server.port` | 启动前 `unset SERVER__PORT` 再执行 `mvn spring-boot:run` |
+| `spring-boot:repackage` 打包失败 | 上一次运行的 java 进程还锁着 jar | 先结束旧 java 进程再重新打包 |
+| 删过源码后启动报「找不到旧类」 | `target/classes` 残留旧 class | 先执行 `mvn clean` |
+| Word 打开报告书目录页码为 0 | 目录是 Word 域 | 打开后右键「更新域」刷新页码 |
