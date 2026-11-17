@@ -149,7 +149,7 @@ function changeStatus(id, target) {
     { type: 'warning' }
   ).then(() => {
     transitingId.value = id
-    request.put(`/activities/${id}/status?target=${target}`).then(() => {
+    request.put(`/activities/${id}/status?status=${target}`).then(() => {
       ElMessage.success(`已变更为「${statusLabel(target)}」`)
       load()
     }).finally(() => { transitingId.value = null })
