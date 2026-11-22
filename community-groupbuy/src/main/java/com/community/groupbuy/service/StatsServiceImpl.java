@@ -32,8 +32,20 @@ public class StatsServiceImpl implements StatsService {
             String fileName = URLEncoder.encode("社区团购订单数据", StandardCharsets.UTF_8).replaceAll("\\+", "%20");
             response.setHeader("Content-disposition", "attachment;filename*=utf-8''" + fileName + ".xlsx");
 
-            List<Map<String, Object>> orderList = statsMapper.getOrderListForExport(null);
-            if (orderList == null) orderList = new ArrayList<>();
+            List<Map<String, Object>> rawList = statsMapper.getOrderListForExport(null);
+            if (rawList == null) rawList = new ArrayList<>();
+
+            // EasyExcel 动态表头要求数据为每行一个单元格列表；Map 需按列顺序转换
+            List<List<Object>> orderList = new ArrayList<>();
+            for (Map<String, Object> m : rawList) {
+                List<Object> row = new ArrayList<>();
+                row.add(m.get("orderNo"));
+                row.add(m.get("username"));
+                row.add(m.get("amount"));
+                row.add(m.get("status"));
+                row.add(m.get("createTime"));
+                orderList.add(row);
+            }
 
             List<List<String>> head = new ArrayList<>();
             head.add(List.of("订单号"));
