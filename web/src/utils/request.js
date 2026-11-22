@@ -3,16 +3,17 @@ import { ElMessage } from 'element-plus'
 import router from '../router'
 import { useUserStore } from '../stores/user'
 
-// 统一请求封装：相对路径 /api 由 Vite 代理转发到后端 8080
+// 统一请求封装：直连后端 8080（后端已放行跨域），不依赖 Vite 代理
 const request = axios.create({
-  baseURL: '/api',
+  baseURL: 'http://localhost:8080/api',
   timeout: 10000
 })
 
 request.interceptors.request.use((config) => {
   const user = useUserStore()
-  if (user.token) {
-    config.headers.Authorization = `Bearer ${user.token}`
+  const token = user.token || localStorage.getItem('cg_token')
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`
   }
   return config
 })

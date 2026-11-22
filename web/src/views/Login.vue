@@ -26,8 +26,10 @@ import { useRouter } from 'vue-router'
 // 注意：如果 web 端的 request 路径不同，请调整下面的导入路径
 import request from '@/utils/request'
 import { ElMessage } from 'element-plus'
+import { useUserStore } from '@/stores/user'
 
 const router = useRouter()
+const userStore = useUserStore()
 const loading = ref(false)
 const form = ref({
   username: 'admin',
@@ -41,15 +43,13 @@ const handleLogin = async () => {
   }
   loading.value = true
   try {
-    const res = await request.post('/api/auth/login', form.value)
-    if (res.code === 200) {
-      localStorage.setItem('token', res.data.token)
-      localStorage.setItem('userInfo', JSON.stringify(res.data))
+    const res = await request.post('/auth/login', form.value)
+    if (res && res.token) {
+      userStore.setLogin(res)
       ElMessage.success('登录成功')
-      // 登录成功后跳转到居民端首页（如果你的首页路由不是 '/' 请自行修改）
       router.push('/')
     } else {
-      ElMessage.error(res.message || '登录失败')
+      ElMessage.error(res && res.message || '登录失败')
     }
   } catch (e) {
     ElMessage.error('网络请求失败，请检查后端服务')

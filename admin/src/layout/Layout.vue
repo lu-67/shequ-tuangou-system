@@ -24,12 +24,12 @@
           <el-icon><Select /></el-icon>
           <span>自提核销</span>
         </el-menu-item>
+        <!-- D 同学：M6 数据统计与订单导出 -->
+        <el-menu-item index="/stats">
+          <el-icon><DataAnalysis /></el-icon>
+          <span>数据统计</span>
+        </el-menu-item>
       </el-menu>
-      <div class="menu-tip">
-        <p>待其他模块实现：</p>
-        <p>· 登录页 / 用户权限 —— D</p>
-        <p>· 统计导出 —— D</p>
-      </div>
     </el-aside>
 
     <el-container>

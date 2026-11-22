@@ -4,6 +4,8 @@ import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.validation.BindException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -23,6 +25,22 @@ public class GlobalExceptionHandler {
     public Result<Void> handleBusiness(BusinessException ex) {
         log.warn("业务异常: code={}, msg={}", ex.getCode(), ex.getMessage());
         return Result.error(ex.getCode(), ex.getMessage());
+    }
+
+    /** 已登录但权限不足（403 越权拦截） */
+    @ExceptionHandler(AccessDeniedException.class)
+    @ResponseStatus(HttpStatus.FORBIDDEN)
+    public Result<Void> handleAccessDenied(AccessDeniedException ex) {
+        log.warn("权限不足: {}", ex.getMessage());
+        return Result.error(ResultCode.FORBIDDEN);
+    }
+
+    /** 未登录或登录已过期（401） */
+    @ExceptionHandler(AuthenticationException.class)
+    @ResponseStatus(HttpStatus.UNAUTHORIZED)
+    public Result<Void> handleUnauthorized(AuthenticationException ex) {
+        log.warn("未认证: {}", ex.getMessage());
+        return Result.error(ResultCode.UNAUTHORIZED);
     }
 
     /** 参数校验失败 (@Valid) */

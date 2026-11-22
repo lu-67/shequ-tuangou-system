@@ -3,6 +3,7 @@ import Layout from '../layout/Layout.vue'
 import Activity from '../views/Activity.vue'
 import Product from '../views/Product.vue'
 import Verification from '../views/Verification.vue'
+import Stats from '../views/Stats.vue'
 // 引入你新建的 Login 页面
 import Login from '../views/Login.vue'
 
@@ -20,7 +21,8 @@ const routes = [
     children: [
       { path: 'activities', name: 'Activity', component: Activity, meta: { title: '开团活动管理' } },
       { path: 'products', name: 'Product', component: Product, meta: { title: '商品管理' } },
-      { path: 'verification', name: 'Verification', component: Verification, meta: { title: '自提核销' } }
+      { path: 'verification', name: 'Verification', component: Verification, meta: { title: '自提核销' } },
+      { path: 'stats', name: 'Stats', component: Stats, meta: { title: '数据统计与导出' } }
     ]
   },
   { path: '/:pathMatch(.*)*', redirect: '/activities' }
@@ -33,8 +35,8 @@ const router = createRouter({
 
 // ================= 全局路由守卫 =================
 router.beforeEach((to, from, next) => {
-  // 获取本地存储的 token
-  const token = localStorage.getItem('token')
+  // 获取本地存储的 token（与登录页/store 使用同一个 key）
+  const token = localStorage.getItem('cg_token')
 
   if (to.path !== '/login' && !token) {
     // 如果没登录，且去的不是登录页，强制跳到登录页

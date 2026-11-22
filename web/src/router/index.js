@@ -34,7 +34,7 @@ const router = createRouter({
 
 // ================= 全局路由守卫（解决 M0 权限拦截） =================
 router.beforeEach((to, from, next) => {
-  const token = localStorage.getItem('token')
+  const token = localStorage.getItem('cg_token')
 
   if (to.path !== '/login' && !token) {
     // 没登录，且想访问首页/订单/个人中心 -> 强制踢到登录页

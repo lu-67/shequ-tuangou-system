@@ -22,8 +22,10 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import request from '@/utils/request'
 import { ElMessage } from 'element-plus'
+import { useUserStore } from '@/stores/user'
 
 const router = useRouter()
+const userStore = useUserStore()
 const loginForm = ref(null)
 const loading = ref(false)
 const form = ref({
@@ -38,14 +40,13 @@ const handleLogin = async () => {
   }
   loading.value = true
   try {
-    const res = await request.post('/api/auth/login', form.value)
-    if (res.code === 200) {
-      localStorage.setItem('token', res.data.token)
-      localStorage.setItem('userInfo', JSON.stringify(res.data))
+    const res = await request.post('/auth/login', form.value)
+    if (res && res.token) {
+      userStore.setLogin(res)
       ElMessage.success('登录成功')
       router.push('/')
     } else {
-      ElMessage.error(res.message || '登录失败')
+      ElMessage.error(res && res.message || '登录失败')
     }
   } catch (e) {
     ElMessage.error('网络请求失败')
